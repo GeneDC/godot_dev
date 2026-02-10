@@ -21,7 +21,7 @@ AllowAllParametersOfDeclarationOnNextLine: false
 # AllowShortCaseLabelsOnASingleLine: false
 # AllowShortFunctionsOnASingleLine: All
 # AllowShortLambdasOnASingleLine: All
-# AllowShortIfStatementsOnASingleLine: Never
+AllowShortIfStatementsOnASingleLine: WithoutElse
 # AllowShortLoopsOnASingleLine: false
 # AlwaysBreakAfterDefinitionReturnType: None
 # AlwaysBreakAfterReturnType: None
@@ -52,7 +52,7 @@ AllowAllParametersOfDeclarationOnNextLine: false
 #   SplitEmptyNamespace: true
 # BreakBeforeBinaryOperators: None
 # BreakBeforeConceptDeclarations: true
-# BreakBeforeBraces: Attach
+BreakBeforeBraces: Allman
 # BreakBeforeInheritanceComma: false
 # BreakInheritanceList: BeforeColon
 # BreakBeforeTernaryOperators: true
@@ -82,13 +82,13 @@ ConstructorInitializerAllOnOneLineOrOnePerLine: true
 #   - BOOST_FOREACH
 # IfMacros:
 #   - KJ_IF_MAYBE
-# IncludeBlocks:   Preserve
+IncludeBlocks: Regroup
 IncludeCategories:
-  - Regex:           '".*"'
+  - Regex:           '^".*"' # Local Project Headers
     Priority:        1
-  - Regex:           '^<.*\.h>'
+  - Regex:           '^<godot_cpp/.*>' # Godot-CPP Bindings
     Priority:        2
-  - Regex:           '^<.*'
+  - Regex:           '^<.*>' # Everything else e.g. C++ Standard Library
     Priority:        3
 # IncludeIsMainRegex: '(Test)?$'
 # IncludeIsMainSourceRegex: ''
@@ -108,7 +108,7 @@ KeepEmptyLinesAtTheStartOfBlocks: false
 # LambdaBodyIndentation: Signature
 # MacroBlockBegin: ''
 # MacroBlockEnd:   ''
-# MaxEmptyLinesToKeep: 1
+MaxEmptyLinesToKeep: 1
 # NamespaceIndentation: None
 # PenaltyBreakAssignment: 2
 # PenaltyBreakBeforeFirstCallParameter: 19
@@ -120,7 +120,7 @@ KeepEmptyLinesAtTheStartOfBlocks: false
 # PenaltyExcessCharacter: 1000000
 # PenaltyReturnTypeOnItsOwnLine: 60
 # PenaltyIndentedWhitespace: 0
-# PointerAlignment: Right
+PointerAlignment: Left
 # PPIndentWidth:   -1
 # ReferenceAlignment: Pointer
 # ReflowComments:  true

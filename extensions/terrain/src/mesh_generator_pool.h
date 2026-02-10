@@ -1,10 +1,19 @@
 #pragma once
 
-#include "godot_cpp/classes/ref_counted.hpp"
-#include <godot_cpp/classes/thread.hpp>
-
-#include "safe_queue.hpp"
 #include "mesh_generator.h"
+#include "safe_queue.hpp"
+
+#include <godot_cpp/classes/mutex.hpp>
+#include <godot_cpp/classes/ref.hpp>
+#include <godot_cpp/classes/ref_counted.hpp>
+#include <godot_cpp/classes/thread.hpp>
+#include <godot_cpp/classes/wrapped.hpp>
+#include <godot_cpp/variant/packed_float32_array.hpp>
+#include <godot_cpp/variant/vector3i.hpp>
+
+#include <atomic>
+#include <cstdint>
+#include <vector>
 
 using namespace godot;
 
@@ -37,7 +46,7 @@ private:
 	std::vector<Ref<Thread>> threads{};
 	std::vector<MeshWorker*> mesh_workers{};
 
-	std::atomic<bool> stopping{false};
+	std::atomic<bool> stopping{ false };
 
 	Ref<Mutex> done_mesh_data_mutex;
 	std::vector<MeshData> done_mesh_data{};

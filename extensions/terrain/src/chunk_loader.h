@@ -1,11 +1,17 @@
 #pragma once
 
-#include "godot_cpp/classes/node3d.hpp"
-#include <godot_cpp/templates/hash_map.hpp>
-#include <godot_cpp/classes/mesh_instance3d.hpp>
-
 #include "chunk_generator.h"
+#include "mesh_generator.h"
 #include "mesh_generator_pool.h"
+
+#include <godot_cpp/classes/mesh_instance3d.hpp>
+#include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/ref.hpp>
+#include <godot_cpp/classes/wrapped.hpp>
+#include <godot_cpp/templates/hash_map.hpp>
+#include <godot_cpp/variant/vector3i.hpp>
+
+#include <vector>
 
 using namespace godot;
 
@@ -17,7 +23,7 @@ public:
 	bool init();
 	void update();
 	void stop();
-	
+
 	void queue_chunk_update(Vector3i chunk_pos);
 
 	Ref<ChunkGenerator> chunk_generator;
@@ -36,5 +42,4 @@ private:
 
 	HashMap<Vector3i, MeshInstance3D*> chunk_node_map{};
 	std::vector<MeshData> mesh_datas{};
-
 };

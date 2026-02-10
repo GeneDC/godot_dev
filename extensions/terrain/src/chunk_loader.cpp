@@ -1,14 +1,31 @@
 #include "chunk_loader.h"
 
-#include <godot_cpp/classes/worker_thread_pool.hpp>
-#include <godot_cpp/classes/time.hpp>
+#include "godot_utility.h"
+#include "mesh_generator.h"
+#include "terrain_constants.hpp"
 
-#include <cstdio>
+#include <godot_cpp/classes/array_mesh.hpp>
+#include <godot_cpp/classes/global_constants.hpp>
+#include <godot_cpp/classes/mesh.hpp>
+#include <godot_cpp/classes/mesh_instance3d.hpp>
+#include <godot_cpp/classes/ref.hpp>
+#include <godot_cpp/classes/time.hpp>
+#include <godot_cpp/classes/worker_thread_pool.hpp>
+#include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/core/memory.hpp>
+#include <godot_cpp/core/object.hpp>
+#include <godot_cpp/core/property_info.hpp>
+#include <godot_cpp/variant/callable.hpp>
+#include <godot_cpp/variant/callable_method_pointer.hpp>
+#include <godot_cpp/variant/packed_float32_array.hpp>
+#include <godot_cpp/variant/variant.hpp>
+#include <godot_cpp/variant/vector3i.hpp>
+
+#include <cstdint>
+#include <iterator>
+#include <vector>
 
 using namespace godot;
-
-#include "godot_utility.h"
-#include "terrain_constants.hpp"
 using namespace terrain_constants;
 
 void ChunkLoader::_bind_methods()
@@ -47,11 +64,9 @@ void ChunkLoader::update()
 		if (!done_mesh_datas.empty())
 		{
 			mesh_datas.insert(
-
-				mesh_datas.end(),
-				std::make_move_iterator(done_mesh_datas.begin()),
-				std::make_move_iterator(done_mesh_datas.end())
-			);
+					mesh_datas.end(),
+					std::make_move_iterator(done_mesh_datas.begin()),
+					std::make_move_iterator(done_mesh_datas.end()));
 		}
 	}
 
@@ -70,7 +85,7 @@ void ChunkLoader::update()
 		mesh_datas.pop_back();
 
 		MeshInstance3D* chunk = get_chunk(mesh_data.chunk_pos);
-	
+
 		Ref<ArrayMesh> array_mesh = chunk->get_mesh();
 		if (array_mesh.is_null())
 		{
@@ -83,7 +98,7 @@ void ChunkLoader::update()
 		{
 			array_mesh->surface_remove(0);
 		}
-		
+
 		if (mesh_data.vertex_count > 0 && !mesh_data.mesh_arrays.is_empty())
 		{
 			array_mesh->add_surface_from_arrays(Mesh::PrimitiveType::PRIMITIVE_TRIANGLES, mesh_data.mesh_arrays);
@@ -139,7 +154,7 @@ MeshInstance3D* ChunkLoader::get_chunk(Vector3i chunk_pos)
 
 #ifdef DEBUG_ENABLED
 	// The node name shouldn't be needed in release so we can skip it for a negligible speed increase
-	char buffer[32]; 
+	char buffer[32];
 	std::snprintf(buffer, sizeof(buffer), "Chunk_%d_%d_%d", chunk_pos.x, chunk_pos.y, chunk_pos.z);
 	mesh_instance->set_name(buffer);
 #endif

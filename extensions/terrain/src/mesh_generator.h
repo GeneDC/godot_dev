@@ -1,17 +1,17 @@
 #pragma once
 
-#include "godot_cpp/classes/node.hpp"
-#include "godot_cpp/classes/resource.hpp"
-#include "godot_cpp/classes/wrapped.hpp"
-#include "godot_cpp/variant/variant.hpp"
-#include "godot_cpp/core/binder_common.hpp"
 #include <godot_cpp/classes/rd_shader_file.hpp>
-#include <godot_cpp/classes/array_mesh.hpp>
-#include <godot_cpp/classes/rendering_device.hpp>
 #include <godot_cpp/classes/rd_shader_spirv.hpp>
-#include <godot_cpp/classes/fast_noise_lite.hpp>
+#include <godot_cpp/classes/ref.hpp>
+#include <godot_cpp/classes/ref_counted.hpp>
+#include <godot_cpp/classes/rendering_device.hpp>
+#include <godot_cpp/classes/wrapped.hpp>
+#include <godot_cpp/variant/array.hpp>
+#include <godot_cpp/variant/packed_float32_array.hpp>
+#include <godot_cpp/variant/rid.hpp>
+#include <godot_cpp/variant/vector3i.hpp>
 
-#include "chunk_generator.h"
+#include <cstdint>
 
 using namespace godot;
 
@@ -51,7 +51,7 @@ private:
 
 	// Shader Input buffers
 	RID points_buffer;
-	
+
 	// Shader Output buffers
 	int vertex_buffer_byte_count = -1;
 	RID vertex_buffer;

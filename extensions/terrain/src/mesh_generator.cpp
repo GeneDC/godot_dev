@@ -1,22 +1,27 @@
 #include "mesh_generator.h"
 
-#include "godot_cpp/classes/surface_tool.hpp"
-#include "godot_cpp/classes/mesh_instance3d.hpp"
-#include "godot_cpp/classes/array_mesh.hpp"
-#include <godot_cpp/classes/standard_material3d.hpp>
-#include <godot_cpp/classes/engine.hpp>
-#include <godot_cpp/classes/scene_tree.hpp>
-#include <godot_cpp/classes/window.hpp>
-#include <godot_cpp/classes/rendering_server.hpp>
-#include <godot_cpp/classes/os.hpp>
-#include <godot_cpp/classes/resource_loader.hpp>
-#include <godot_cpp/classes/rd_uniform.hpp>
-
-
-using namespace godot;
-
 #include "godot_utility.h"
 #include "terrain_constants.hpp"
+
+#include <godot_cpp/classes/mesh.hpp>
+#include <godot_cpp/classes/os.hpp>
+#include <godot_cpp/classes/rd_uniform.hpp>
+#include <godot_cpp/classes/ref.hpp>
+#include <godot_cpp/classes/rendering_device.hpp>
+#include <godot_cpp/classes/rendering_server.hpp>
+#include <godot_cpp/classes/resource_loader.hpp>
+#include <godot_cpp/core/memory.hpp>
+#include <godot_cpp/variant/packed_byte_array.hpp>
+#include <godot_cpp/variant/packed_float32_array.hpp>
+#include <godot_cpp/variant/packed_vector3_array.hpp>
+#include <godot_cpp/variant/typed_array.hpp>
+#include <godot_cpp/variant/vector3i.hpp>
+
+#include <cstdint>
+#include <cstring>
+#include <utility>
+
+using namespace godot;
 using namespace terrain_constants;
 
 MeshGenerator::~MeshGenerator()
@@ -31,7 +36,7 @@ MeshGenerator::~MeshGenerator()
 		if (count_buffer.is_valid()) local_rendering_device->free_rid(count_buffer);
 		if (uniform_set.is_valid()) local_rendering_device->free_rid(uniform_set);
 		if (pipeline.is_valid()) local_rendering_device->free_rid(pipeline);
-		
+
 		memdelete(local_rendering_device);
 		local_rendering_device = nullptr;
 	}
@@ -42,32 +47,37 @@ bool MeshGenerator::init()
 	rendering_thread_id = OS::get_singleton()->get_thread_caller_id();
 
 	RenderingServer* rendering_server = RenderingServer::get_singleton();
-	if (!rendering_server) {
+	if (!rendering_server)
+	{
 		PRINT_ERROR("Failed to get rendering server");
 		return false;
 	}
 
 	local_rendering_device = rendering_server->create_local_rendering_device();
-	if (!local_rendering_device) {
+	if (!local_rendering_device)
+	{
 		PRINT_ERROR("Failed to create local rendering device");
 		return false;
 	}
 
 	ResourceLoader* resource_loader = ResourceLoader::get_singleton();
-	if (!resource_loader) {
+	if (!resource_loader)
+	{
 		PRINT_ERROR("Missing Resource Loader Singleton");
 		return false;
 	}
 
 	shader_file = resource_loader->load("res://scripts/ComputeCubes.glsl");
-	if (shader_file.is_null()) {
+	if (shader_file.is_null())
+	{
 		PRINT_ERROR("Failed to load shader file");
 		return false;
 	}
 
 	shader_spirv = shader_file->get_spirv();
 	shader = local_rendering_device->shader_create_from_spirv(shader_spirv);
-	if (!shader.is_valid()) {
+	if (!shader.is_valid())
+	{
 		PRINT_ERROR("Failed to create shader from spirv:");
 		PRINT_ERROR(shader_spirv->get_stage_compile_error(RenderingDevice::ShaderStage::SHADER_STAGE_COMPUTE));
 		return false;
@@ -91,7 +101,7 @@ bool MeshGenerator::init()
 	vertex_buffer_byte_count = max_vertex_count * sizeof(float) * 3;
 	vertex_buffer = local_rendering_device->storage_buffer_create(vertex_buffer_byte_count);
 
-	Ref<RDUniform> uniform_vertex{}; 
+	Ref<RDUniform> uniform_vertex{};
 	uniform_vertex.instantiate();
 	uniform_vertex->set_uniform_type(RenderingDevice::UNIFORM_TYPE_STORAGE_BUFFER);
 	uniform_vertex->set_binding(1);
@@ -100,7 +110,7 @@ bool MeshGenerator::init()
 
 	normal_buffer = local_rendering_device->storage_buffer_create(vertex_buffer_byte_count);
 
-	Ref<RDUniform> uniform_normal{}; 
+	Ref<RDUniform> uniform_normal{};
 	uniform_normal.instantiate();
 	uniform_normal->set_uniform_type(RenderingDevice::UNIFORM_TYPE_STORAGE_BUFFER);
 	uniform_normal->set_binding(2);
@@ -110,7 +120,7 @@ bool MeshGenerator::init()
 	colour_buffer_byte_count = max_vertex_count * sizeof(float) * 4;
 	colour_buffer = local_rendering_device->storage_buffer_create(colour_buffer_byte_count);
 
-	Ref<RDUniform> uniform_colour{}; 
+	Ref<RDUniform> uniform_colour{};
 	uniform_colour.instantiate();
 	uniform_colour->set_uniform_type(RenderingDevice::UNIFORM_TYPE_STORAGE_BUFFER);
 	uniform_colour->set_binding(3);
@@ -119,7 +129,7 @@ bool MeshGenerator::init()
 
 	count_buffer = local_rendering_device->storage_buffer_create(sizeof(uint32_t));
 
-	Ref<RDUniform> uniform_count{}; 
+	Ref<RDUniform> uniform_count{};
 	uniform_count.instantiate();
 	uniform_count->set_uniform_type(RenderingDevice::UNIFORM_TYPE_STORAGE_BUFFER);
 	uniform_count->set_binding(4);

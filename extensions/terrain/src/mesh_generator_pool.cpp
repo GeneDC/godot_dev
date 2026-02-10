@@ -1,6 +1,19 @@
 #include "mesh_generator_pool.h"
 
 #include "godot_utility.h"
+#include "mesh_generator.h"
+
+#include <godot_cpp/classes/ref.hpp>
+#include <godot_cpp/classes/thread.hpp>
+#include <godot_cpp/core/memory.hpp>
+#include <godot_cpp/variant/callable.hpp>
+#include <godot_cpp/variant/callable_method_pointer.hpp>
+#include <godot_cpp/variant/packed_float32_array.hpp>
+#include <godot_cpp/variant/vector3i.hpp>
+
+#include <cstdint>
+#include <utility>
+#include <vector>
 
 using namespace godot;
 
@@ -13,19 +26,19 @@ void MeshGeneratorPool::init(uint32_t p_thread_count)
 	}
 
 	done_mesh_data_mutex.instantiate();
-	
+
 	for (int i = 0; i < p_thread_count; i++)
 	{
 		Ref<Thread> thread;
 		thread.instantiate();
-		
+
 		mesh_workers.emplace_back(memnew(MeshWorker));
 		uint64_t index = mesh_workers.size() - 1;
 
 		Callable callable = callable_mp(this, &MeshGeneratorPool::_thread_loop);
 		Callable bound_callable = callable.bind(index);
 		thread->start(bound_callable);
-		
+
 		threads.emplace_back(thread);
 	}
 }
@@ -39,7 +52,7 @@ void MeshGeneratorPool::stop()
 		// Add null tasks to wake up the threads
 		task_queue.push(nullptr);
 	}
-	
+
 	for (Ref<Thread> thread : threads)
 	{
 		if (thread.is_valid() && thread->is_started())
@@ -48,7 +61,7 @@ void MeshGeneratorPool::stop()
 		}
 	}
 	threads.clear();
-	
+
 	for (MeshWorker* mesh_worker : mesh_workers)
 	{
 		memdelete(mesh_worker);
@@ -74,7 +87,7 @@ std::vector<MeshData> MeshGeneratorPool::take_done_mesh_data()
 {
 	done_mesh_data_mutex->lock();
 	std::vector<MeshData> result = std::move(done_mesh_data);
-	done_mesh_data.clear(); 
+	done_mesh_data.clear();
 	done_mesh_data_mutex->unlock();
 	return result;
 }

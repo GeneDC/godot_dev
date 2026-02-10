@@ -1,7 +1,9 @@
 #pragma once
 
 #include <godot_cpp/classes/mutex.hpp>
+#include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/semaphore.hpp>
+
 #include <deque>
 
 using namespace godot;
@@ -28,13 +30,13 @@ public:
 	T pop_blocking()
 	{
 		semaphore->wait();
-		
+
 		mutex->lock();
 
 		if (queue.empty())
 		{
 			mutex->unlock();
-			return nullptr; 
+			return nullptr;
 		}
 
 		T value = queue.front();

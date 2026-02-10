@@ -1,7 +1,14 @@
 #pragma once
 
 #include "godot_cpp/classes/resource.hpp"
+
 #include <godot_cpp/classes/fast_noise_lite.hpp>
+#include <godot_cpp/classes/ref.hpp>
+#include <godot_cpp/classes/wrapped.hpp>
+#include <godot_cpp/templates/vector.hpp>
+#include <godot_cpp/variant/packed_float32_array.hpp>
+#include <godot_cpp/variant/vector3.hpp>
+#include <godot_cpp/variant/vector3i.hpp>
 
 using namespace godot;
 
@@ -40,5 +47,5 @@ protected:
 	void set_height_multiplier_noise(Ref<FastNoiseLite> p_height_multiplier_noise) { height_multiplier_noise = p_height_multiplier_noise; }
 
 private:
-	Vector<float> _generate_height_map(int p_size, const Vector3 &p_chunk_world_pos) const;
+	Vector<float> _generate_height_map(int p_size, const Vector3& p_chunk_world_pos) const;
 };

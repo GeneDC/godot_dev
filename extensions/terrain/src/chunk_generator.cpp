@@ -1,12 +1,21 @@
 #include "chunk_generator.h"
 
-#include <godot_cpp/classes/engine.hpp>
-#include <godot_cpp/classes/scene_tree.hpp>
-#include <godot_cpp/classes/os.hpp>
+#include "terrain_constants.hpp"
+
+#include <godot_cpp/classes/global_constants.hpp>
+#include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/core/defs.hpp>
+#include <godot_cpp/core/object.hpp>
+#include <godot_cpp/core/print_string.hpp>
+#include <godot_cpp/core/property_info.hpp>
+#include <godot_cpp/templates/vector.hpp>
+#include <godot_cpp/variant/packed_float32_array.hpp>
+#include <godot_cpp/variant/variant.hpp>
+#include <godot_cpp/variant/vector2.hpp>
+#include <godot_cpp/variant/vector3.hpp>
+#include <godot_cpp/variant/vector3i.hpp>
 
 using namespace godot;
-
-#include "terrain_constants.hpp"
 using namespace terrain_constants;
 
 void ChunkGenerator::_bind_methods()
@@ -42,11 +51,14 @@ PackedFloat32Array ChunkGenerator::generate_points(Vector3i chunk_pos) const
 
 	Vector<float> height_map = _generate_height_map(POINTS_SIZE, chunk_world_pos);
 
-	for (int x = 0; x < POINTS_SIZE; x++) {
-		for (int z = 0; z < POINTS_SIZE; z++) {
+	for (int x = 0; x < POINTS_SIZE; x++)
+	{
+		for (int z = 0; z < POINTS_SIZE; z++)
+		{
 			float height = height_map[x + z * POINTS_SIZE];
 
-			for (int y = 0; y < POINTS_SIZE; y++) {
+			for (int y = 0; y < POINTS_SIZE; y++)
+			{
 				Vector3 world_pos = chunk_world_pos + Vector3(x, y, z);
 
 				//float density = generate_density(world_pos, height);
@@ -57,11 +69,11 @@ PackedFloat32Array ChunkGenerator::generate_points(Vector3i chunk_pos) const
 			}
 		}
 	}
-	
+
 	return points;
 }
 
-Vector<float> ChunkGenerator::_generate_height_map(int p_size, const Vector3 &p_chunk_world_pos) const
+Vector<float> ChunkGenerator::_generate_height_map(int p_size, const Vector3& p_chunk_world_pos) const
 {
 	Vector<float> height_map = Vector<float>();
 	height_map.resize(p_size * p_size);
