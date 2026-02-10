@@ -7,10 +7,12 @@
 #include <godot_cpp/classes/mesh_instance3d.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/ref.hpp>
+#include <godot_cpp/classes/worker_thread_pool.hpp>
 #include <godot_cpp/classes/wrapped.hpp>
 #include <godot_cpp/templates/hash_map.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
 
+#include <cstdint>
 #include <vector>
 
 using namespace godot;
@@ -24,6 +26,7 @@ public:
 	void update();
 	void stop();
 
+	void update_chunks(Vector3i centre_pos, int32_t radius);
 	void queue_chunk_update(Vector3i chunk_pos);
 
 	Ref<ChunkGenerator> chunk_generator;
@@ -40,6 +43,12 @@ protected:
 private:
 	MeshInstance3D* get_chunk(Vector3i chunk_pos);
 
+	void _update_chunks(Vector3i centre_pos, int32_t radius);
+	void _process_group_chunk(uint32_t p_index);
+
 	HashMap<Vector3i, MeshInstance3D*> chunk_node_map{};
 	std::vector<MeshData> mesh_datas{};
+
+	std::vector<Vector3i> pending_chunks;
+	WorkerThreadPool::TaskID current_group_id = WorkerThreadPool::INVALID_TASK_ID;
 };

@@ -18,9 +18,12 @@
 #include <godot_cpp/variant/callable.hpp>
 #include <godot_cpp/variant/callable_method_pointer.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
+#include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/variant.hpp>
+#include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <iterator>
 #include <vector>
@@ -33,6 +36,7 @@ void ChunkLoader::_bind_methods()
 	ClassDB::bind_method(D_METHOD("init"), &ChunkLoader::init);
 	ClassDB::bind_method(D_METHOD("update"), &ChunkLoader::update);
 	ClassDB::bind_method(D_METHOD("stop"), &ChunkLoader::stop);
+	ClassDB::bind_method(D_METHOD("update_chunks", "centre_pos", "radius"), &ChunkLoader::update_chunks);
 	ClassDB::bind_method(D_METHOD("queue_chunk_update", "chunk_pos"), &ChunkLoader::queue_chunk_update);
 
 	ClassDB::bind_method(D_METHOD("get_chunk_generator"), &ChunkLoader::get_chunk_generator);
@@ -59,6 +63,10 @@ bool ChunkLoader::init()
 
 void ChunkLoader::update()
 {
+	uint64_t start_time = Time::get_singleton()->get_ticks_usec();
+	// budget in microseconds: 2000us = 2ms
+	constexpr uint64_t time_budget = 4000;
+
 	{ // move the done meshes to our array so we can take time applying them
 		std::vector<MeshData> done_mesh_datas = mesh_generator_pool->take_done_mesh_data();
 		if (!done_mesh_datas.empty())
@@ -67,12 +75,20 @@ void ChunkLoader::update()
 					mesh_datas.end(),
 					std::make_move_iterator(done_mesh_datas.begin()),
 					std::make_move_iterator(done_mesh_datas.end()));
+
+			Vector3 centre_pos{}; // TODO: Get the plater position here
+			std::sort(mesh_datas.begin(), mesh_datas.end(),
+					[centre_pos](const MeshData& a, const MeshData& b)
+					{
+						return centre_pos.distance_squared_to(a.chunk_pos) > centre_pos.distance_squared_to(b.chunk_pos);
+					});
+
+			if (Time::get_singleton()->get_ticks_usec() - start_time > time_budget)
+			{
+				PRINT_ERROR(godot::String("sorting ") + mesh_datas.size() + " mesh datas took too long!");
+			}
 		}
 	}
-
-	uint64_t start_time = Time::get_singleton()->get_ticks_usec();
-	// budget in microseconds: 2000us = 2ms
-	constexpr uint64_t time_budget = 4000;
 
 	while (!mesh_datas.empty())
 	{
@@ -109,6 +125,77 @@ void ChunkLoader::update()
 void ChunkLoader::stop()
 {
 	mesh_generator_pool->stop(); // Blocks execution until all threads are stopped
+}
+
+void ChunkLoader::update_chunks(Vector3i centre_pos, int32_t radius)
+{
+	if (current_group_id != WorkerThreadPool::INVALID_TASK_ID)
+	{
+		WorkerThreadPool::get_singleton()->wait_for_group_task_completion(current_group_id);
+	}
+
+	Callable setup_func = callable_mp(this, &ChunkLoader::_update_chunks);
+	WorkerThreadPool::get_singleton()->add_task(setup_func.bind(centre_pos, radius));
+}
+
+void ChunkLoader::_update_chunks(Vector3i centre_pos, int32_t radius)
+{
+	pending_chunks.clear();
+	uint64_t side = (static_cast<uint64_t>(radius) * 2) + 1;
+	pending_chunks.reserve(side * side * side);
+
+	float radius_squared = static_cast<float>(radius * radius);
+	for (int32_t x = -radius; x <= radius; ++x)
+	{
+		for (int32_t y = -radius; y <= radius; ++y)
+		{
+			for (int32_t z = -radius; z <= radius; ++z)
+			{
+				if (Vector3(x, y, z).length_squared() < radius_squared)
+				{
+					pending_chunks.push_back(centre_pos + Vector3i(x, y, z));
+				}
+			}
+		}
+	}
+
+	// Will only sort the chunks under this threshold. Sorting the higher thresholds is significantally more expensive for not much benefit.
+	float fine_sort_threshold = 4.0f; // TODO: Make this variable
+
+	float threshold_increment = 2.0f; // TODO: Make this variable
+	float threshold = threshold_increment;
+	float target_threshold = static_cast<float>(radius);
+	auto threshold_begin_iterator = pending_chunks.begin();
+	do
+	{
+		// Incremental Partition significantally faster than sort
+		float threshold_squared = threshold * threshold;
+		auto threshold_end_iterator = std::partition(threshold_begin_iterator, pending_chunks.end(),
+				[centre_pos, threshold_squared](const Vector3i& coord)
+				{
+					return centre_pos.distance_squared_to(coord) <= threshold_squared;
+				});
+
+		if (threshold <= fine_sort_threshold)
+		{
+			std::sort(threshold_begin_iterator, threshold_end_iterator,
+					[centre_pos](const Vector3i& a, const Vector3i& b)
+					{
+						return centre_pos.distance_squared_to(a) > centre_pos.distance_squared_to(b);
+					});
+		}
+		threshold_begin_iterator = threshold_end_iterator;
+		threshold += threshold_increment;
+
+	} while (threshold < target_threshold);
+
+	Callable worker_callable = callable_mp(this, &ChunkLoader::_process_group_chunk);
+	current_group_id = WorkerThreadPool::get_singleton()->add_group_task(
+			worker_callable,
+			pending_chunks.size(), // number_of_elements
+			-1, // elements_per_thread, -1 lets Godot decide the best distribution
+			true, // high priority
+			"ChunkGeneration");
 }
 
 void ChunkLoader::queue_chunk_update(Vector3i chunk_pos)
@@ -163,4 +250,10 @@ MeshInstance3D* ChunkLoader::get_chunk(Vector3i chunk_pos)
 	chunk_node_map[chunk_pos] = mesh_instance;
 
 	return mesh_instance;
+}
+
+void ChunkLoader::_process_group_chunk(uint32_t p_index)
+{
+	Vector3i coord = pending_chunks[p_index];
+	_queue_generate_mesh_data(coord);
 }
