@@ -68,4 +68,5 @@ CMakeUserPresets.json
 # Other
 */build/*
 *bin/*
-/extensions/terrain/*.vcxproj
+*.vcxproj
+*.vcxproj.user
