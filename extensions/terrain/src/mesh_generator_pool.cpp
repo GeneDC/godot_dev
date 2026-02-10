@@ -20,7 +20,7 @@ void MeshGeneratorPool::init(uint32_t p_thread_count)
 		thread.instantiate();
 		
 		mesh_workers.emplace_back(memnew(MeshWorker));
-		size_t index = mesh_workers.size() - 1;
+		uint64_t index = mesh_workers.size() - 1;
 
 		Callable callable = callable_mp(this, &MeshGeneratorPool::_thread_loop);
 		Callable bound_callable = callable.bind(index);
@@ -79,7 +79,7 @@ std::vector<MeshData> MeshGeneratorPool::take_done_mesh_data()
 	return result;
 }
 
-void MeshGeneratorPool::_thread_loop(size_t mesh_worker_index)
+void MeshGeneratorPool::_thread_loop(uint64_t mesh_worker_index)
 {
 	auto mesh_worker = mesh_workers[mesh_worker_index];
 	mesh_worker->mesh_generator.instantiate();

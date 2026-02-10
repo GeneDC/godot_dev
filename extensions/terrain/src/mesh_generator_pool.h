@@ -42,5 +42,5 @@ private:
 	Ref<Mutex> done_mesh_data_mutex;
 	std::vector<MeshData> done_mesh_data{};
 
-	void _thread_loop(size_t mesh_worker_index);
+	void _thread_loop(uint64_t mesh_worker_index);
 };
