@@ -1,9 +1,23 @@
 name: Build GDExtension
+
 on:
   workflow_call:
   push:
+    paths:
+      - 'extensions/terrain/**'
+      - '.github/workflows/**'
   pull_request:
+      paths:
+      - 'extensions/terrain/**'
+      - '.github/workflows/**'
   merge_group:
+
+defaults: 
+  run: 
+    working-directory: extensions/terrain
+    
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -96,11 +110,11 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: godot-cpp-template-${{ matrix.target.platform }}-${{ matrix.target.arch }}-${{ matrix.float-precision }}-${{ matrix.target-type }}
+          name: godot_dev-${{ matrix.target.platform }}-${{ matrix.target.arch }}-${{ matrix.float-precision }}-${{ matrix.target-type }}
           path: |
             ${{ github.workspace }}/bin/**
 
-  # Merges all the build artifacts together into a single godot-cpp-template artifact.
+  # Merges all the build artifacts together into a single godot_dev artifact.
   # If you comment out this step, all the builds will be uploaded individually.
   merge:
     runs-on: ubuntu-22.04
@@ -109,6 +123,6 @@ jobs:
       - name: Merge Artifacts
         uses: actions/upload-artifact/merge@v4
         with:
-          name: godot-cpp-template
-          pattern: godot-cpp-template-*
+          name: godot_dev
+          pattern: godot_dev-*
           delete-merged: true
