@@ -4,6 +4,7 @@ import sys
 
 from methods import print_error
 
+CacheDir('.scons_cache')
 Decider('MD5-timestamp')
 SetOption('max_drift', 1)
 

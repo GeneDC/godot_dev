@@ -68,5 +68,8 @@ CMakeUserPresets.json
 # Other
 */build/*
 *bin/*
-*.vcxproj
-*.vcxproj.user
+*.vcxproj*
+*.scons_cache*
+build/
+/bin/
+/project/bin
