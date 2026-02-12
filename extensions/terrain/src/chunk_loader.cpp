@@ -85,7 +85,7 @@ void ChunkLoader::update()
 
 			if (Time::get_singleton()->get_ticks_usec() - start_time > time_budget)
 			{
-				PRINT_ERROR(godot::String("sorting ") + mesh_datas.size() + " mesh datas took too long!");
+				PRINT_ERROR("sorting %d mesh datas took too long!", mesh_datas.size());
 			}
 		}
 	}
