@@ -24,7 +24,7 @@ class MeshGeneratorPool : public RefCounted
 public:
 	void init(uint32_t p_thread_count);
 	void stop();
-	void queue_generate_mesh_data(Vector3i chunk_pos, PackedFloat32Array points);
+	void queue_generate_mesh_data(Vector3i chunk_pos, PackedFloat32Array points, bool prioritise = false);
 
 	[[nodiscard]] std::vector<MeshData> take_done_mesh_data();
 

@@ -69,18 +69,18 @@ void MeshGeneratorPool::stop()
 	mesh_workers.clear();
 }
 
-void MeshGeneratorPool::queue_generate_mesh_data(Vector3i chunk_pos, PackedFloat32Array points)
+void MeshGeneratorPool::queue_generate_mesh_data(Vector3i chunk_pos, PackedFloat32Array points, bool prioritise)
 {
 	if (stopping)
 	{
-		PRINT_ERROR("can't update chunk while stopping");
+		PRINT_ERROR("MeshGeneratorPool is stopping. Mesh generate will be skipped.");
 		return;
 	}
 
 	Task* task = memnew(Task);
 	task->chunk_pos = chunk_pos;
 	task->points = points;
-	task_queue.push(task);
+	task_queue.push(task, prioritise);
 }
 
 std::vector<MeshData> MeshGeneratorPool::take_done_mesh_data()

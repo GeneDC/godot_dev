@@ -18,7 +18,6 @@
 #include <godot_cpp/variant/callable.hpp>
 #include <godot_cpp/variant/callable_method_pointer.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
-#include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/variant.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
@@ -27,6 +26,7 @@
 #include <cstdint>
 #include <iterator>
 #include <vector>
+#include <cstdio>
 
 using namespace godot;
 using namespace terrain_constants;
@@ -76,7 +76,7 @@ void ChunkLoader::update()
 					std::make_move_iterator(done_mesh_datas.begin()),
 					std::make_move_iterator(done_mesh_datas.end()));
 
-			Vector3 centre_pos{}; // TODO: Get the plater position here
+			Vector3 centre_pos{}; // TODO: Get the player position here
 			std::sort(mesh_datas.begin(), mesh_datas.end(),
 					[centre_pos](const MeshData& a, const MeshData& b)
 					{
@@ -85,7 +85,7 @@ void ChunkLoader::update()
 
 			if (Time::get_singleton()->get_ticks_usec() - start_time > time_budget)
 			{
-				PRINT_ERROR("sorting %d mesh datas took too long!", mesh_datas.size());
+				PRINT_ERROR("sorting %d mesh datas took too long!", static_cast<uint64_t>(mesh_datas.size()));
 			}
 		}
 	}
@@ -194,11 +194,11 @@ void ChunkLoader::_update_chunks(Vector3i centre_pos, int32_t radius)
 			worker_callable,
 			pending_chunks.size(), // number_of_elements
 			-1, // elements_per_thread, -1 lets Godot decide the best distribution
-			true, // high priority
+			false, // low priority to avoid starving the CPU
 			"ChunkGeneration");
 }
 
-void ChunkLoader::queue_chunk_update(Vector3i chunk_pos)
+void ChunkLoader::queue_chunk_update(Vector3i chunk_pos, bool prioritise)
 {
 	if (!mesh_generator_pool.is_valid())
 	{
@@ -213,14 +213,13 @@ void ChunkLoader::queue_chunk_update(Vector3i chunk_pos)
 	}
 
 	Callable callable = callable_mp(this, &ChunkLoader::_queue_generate_mesh_data);
-	Callable callable_bound = callable.bind(chunk_pos);
-	WorkerThreadPool::get_singleton()->add_task(callable_bound, true);
+	WorkerThreadPool::get_singleton()->add_task(callable.bind(chunk_pos, prioritise), true);
 }
 
-void ChunkLoader::_queue_generate_mesh_data(Vector3i chunk_pos)
+void ChunkLoader::_queue_generate_mesh_data(Vector3i chunk_pos, bool prioritise)
 {
 	PackedFloat32Array points = chunk_generator->generate_points(chunk_pos);
-	mesh_generator_pool->queue_generate_mesh_data(chunk_pos, points);
+	mesh_generator_pool->queue_generate_mesh_data(chunk_pos, points, prioritise);
 }
 
 MeshInstance3D* ChunkLoader::get_chunk(Vector3i chunk_pos)
@@ -255,5 +254,8 @@ MeshInstance3D* ChunkLoader::get_chunk(Vector3i chunk_pos)
 void ChunkLoader::_process_group_chunk(uint32_t p_index)
 {
 	Vector3i coord = pending_chunks[p_index];
-	_queue_generate_mesh_data(coord);
+	Vector3 centre_pos{}; // TODO: Get the player position here
+	float priority_distance = 2.0f; // TODO: Make configurable
+	bool prioritise = Vector3(coord).distance_squared_to(centre_pos) < priority_distance * priority_distance; 
+	_queue_generate_mesh_data(coord, prioritise);
 }

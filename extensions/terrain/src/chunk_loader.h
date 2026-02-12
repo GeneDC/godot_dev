@@ -27,7 +27,7 @@ public:
 	void stop();
 
 	void update_chunks(Vector3i centre_pos, int32_t radius);
-	void queue_chunk_update(Vector3i chunk_pos);
+	void queue_chunk_update(Vector3i chunk_pos, bool prioritise = false);
 
 	Ref<ChunkGenerator> chunk_generator;
 	Ref<MeshGeneratorPool> mesh_generator_pool;
@@ -35,7 +35,7 @@ public:
 protected:
 	static void _bind_methods();
 
-	void _queue_generate_mesh_data(Vector3i chunk_pos);
+	void _queue_generate_mesh_data(Vector3i chunk_pos, bool prioritise = false);
 
 	Ref<ChunkGenerator> get_chunk_generator() const { return chunk_generator; }
 	void set_chunk_generator(Ref<ChunkGenerator> p_chunk_generator) { chunk_generator = p_chunk_generator; }
