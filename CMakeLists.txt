@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19)
+cmake_minimum_required(VERSION 3.20)
 project(godot_dev)
 
 set(GD_ENGINE_VERSION "4.5")
@@ -7,7 +7,7 @@ set(GD_ENGINE_EXE "${GD_ENGINE_DIR}/bin/godot.windows.editor.dev.x86_64.exe")
 set(GD_PROJECT_DIR "${CMAKE_SOURCE_DIR}/project")
 set(GD_CPP_DIR "${CMAKE_SOURCE_DIR}/godot-cpp")
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_EXTENSIONS ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_COLOR_DIAGNOSTICS ON)
