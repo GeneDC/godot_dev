@@ -63,7 +63,7 @@ void AddTri(vec4 vert_a, vec4 vert_b, vec4 vert_c)
 	vec3 vert_a_v3 = vert_a.xyz;
 	vec3 vert_b_v3 = vert_b.xyz;
 	vec3 vert_c_v3 = vert_c.xyz;
-	vec4 cross_norm = vec4(normalize(cross(vert_b_v3 - vert_a_v3, vert_c_v3 - vert_a_v3)), 0);
+	vec4 cross_norm = vec4(normalize(cross(vert_b_v3 - vert_c_v3, vert_a_v3 - vert_c_v3)), 0);
 	// Normal A
 	normal_buffer.normals[vert_index + 0] = cross_norm.x;
 	normal_buffer.normals[vert_index + 1] = cross_norm.y;
@@ -77,8 +77,17 @@ void AddTri(vec4 vert_a, vec4 vert_b, vec4 vert_c)
 	normal_buffer.normals[vert_index + 7] = cross_norm.y;
 	normal_buffer.normals[vert_index + 8] = cross_norm.z;
 
-	vec4 terrain_colour = vec4(0.2, 0.8, 0.2, 1.0); // Green
-	if (vert_a.y > 10.0) terrain_colour = vec4(0.9, 0.9, 0.9, 1.0); // Snow
+	// Represents hot flat the triangle is. Where 1 is flat and 0 is a cliff face. Probably better named flatness_factor
+	float slope_factor = cross_norm.y;
+
+	vec4 grass_colour = vec4(0.2, 0.8, 0.2, 1.0);
+	vec4 rock_colour  = vec4(0.4, 0.3, 0.2, 1.0);
+
+	// Blends between rock and grass
+	// Surfaces steeper than ~53 degrees (0.6) are rock
+	// Surfaces flatter than ~36 degrees (0.8) are grass
+	float transition = smoothstep(0.6, 0.8, slope_factor);
+	vec4 terrain_colour = mix(rock_colour, grass_colour, transition);
 
 	colour_buffer.colours[index] = terrain_colour;
 	colour_buffer.colours[index + 1] = terrain_colour;

@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <cstring>
 #include <utility>
+#include <godot_cpp/variant/packed_vector4_array.hpp>
 
 using namespace godot;
 using namespace terrain_constants;
@@ -67,6 +68,7 @@ bool MeshGenerator::init()
 		return false;
 	}
 
+	// TODO: make this shader file not hard coded
 	shader_file = resource_loader->load("res://scripts/ComputeCubes.glsl");
 	if (shader_file.is_null())
 	{
@@ -213,22 +215,13 @@ MeshData MeshGenerator::generate_mesh_data(Vector3i chunk_pos, PackedFloat32Arra
 		mesh_data.mesh_arrays.resize(Mesh::ARRAY_MAX);
 
 		PackedByteArray vertex_data = local_rendering_device->buffer_get_data(vertex_buffer, 0, vertex_count * sizeof(float) * 3);
-		PackedVector3Array vertices{};
-		vertices.resize(vertex_count);
-		memcpy(vertices.ptrw(), vertex_data.ptr(), vertex_data.size());
-		mesh_data.mesh_arrays[Mesh::ARRAY_VERTEX] = std::move(vertices);
+		mesh_data.mesh_arrays[Mesh::ARRAY_VERTEX] = vertex_data.to_vector3_array();
 
 		PackedByteArray normal_data = local_rendering_device->buffer_get_data(normal_buffer, 0, vertex_count * sizeof(float) * 3);
-		PackedVector3Array normals{};
-		normals.resize(vertex_count);
-		memcpy(normals.ptrw(), normal_data.ptr(), normal_data.size());
-		mesh_data.mesh_arrays[Mesh::ARRAY_NORMAL] = std::move(normals);
+		mesh_data.mesh_arrays[Mesh::ARRAY_NORMAL] = normal_data.to_vector3_array();
 
-		//PackedColorArray colour_data = local_rendering_device->buffer_get_data(colour_buffer, 0, vertex_count * sizeof(float) * 4);
-		//PackedVector3Array colours{};
-		//colours.resize(vertex_count);
-		//memcpy(colours.ptrw(), colour_data.ptr(), colour_data.size());
-		//mesh_arrays[Mesh::ARRAY_COLOR] = std::move(colours);
+		PackedByteArray colour_data = local_rendering_device->buffer_get_data(colour_buffer, 0, vertex_count * sizeof(float) * 4);
+		mesh_data.mesh_arrays[Mesh::ARRAY_COLOR] = colour_data.to_color_array();
 	}
 
 	return mesh_data;

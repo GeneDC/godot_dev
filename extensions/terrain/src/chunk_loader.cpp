@@ -27,6 +27,7 @@
 #include <iterator>
 #include <vector>
 #include <cstdio>
+#include <godot_cpp/classes/standard_material3d.hpp>
 
 using namespace godot;
 using namespace terrain_constants;
@@ -42,6 +43,10 @@ void ChunkLoader::_bind_methods()
 	ClassDB::bind_method(D_METHOD("get_chunk_generator"), &ChunkLoader::get_chunk_generator);
 	ClassDB::bind_method(D_METHOD("set_chunk_generator", "chunk_generator"), &ChunkLoader::set_chunk_generator);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "chunk_generator", PROPERTY_HINT_RESOURCE_TYPE, "ChunkGenerator"), "set_chunk_generator", "get_chunk_generator");
+
+	ClassDB::bind_method(D_METHOD("get_material"), &ChunkLoader::get_material);
+	ClassDB::bind_method(D_METHOD("set_material", "material"), &ChunkLoader::set_material);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "material", PROPERTY_HINT_RESOURCE_TYPE, "StandardMaterial3D"), "set_material", "get_material");
 }
 
 bool ChunkLoader::init()
@@ -49,6 +54,12 @@ bool ChunkLoader::init()
 	if (!chunk_generator.is_valid())
 	{
 		PRINT_ERROR("chunk_generator not set!");
+		return false;
+	}
+
+	if (!material.is_valid())
+	{
+		PRINT_ERROR("material not set!");
 		return false;
 	}
 
@@ -237,6 +248,8 @@ MeshInstance3D* ChunkLoader::get_chunk(Vector3i chunk_pos)
 	mesh_instance->set_mesh(array_mesh);
 
 	mesh_instance->set_position(chunk_pos * CHUNK_SIZE);
+
+	mesh_instance->set_material_override(material);
 
 #ifdef DEBUG_ENABLED
 	// The node name shouldn't be needed in release so we can skip it for a negligible speed increase

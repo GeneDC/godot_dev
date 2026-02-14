@@ -14,6 +14,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <godot_cpp/classes/standard_material3d.hpp>
 
 using namespace godot;
 
@@ -32,6 +33,8 @@ public:
 	Ref<ChunkGenerator> chunk_generator;
 	Ref<MeshGeneratorPool> mesh_generator_pool;
 
+	Ref<StandardMaterial3D> material;
+
 protected:
 	static void _bind_methods();
 
@@ -39,6 +42,9 @@ protected:
 
 	Ref<ChunkGenerator> get_chunk_generator() const { return chunk_generator; }
 	void set_chunk_generator(Ref<ChunkGenerator> p_chunk_generator) { chunk_generator = p_chunk_generator; }
+
+	Ref<StandardMaterial3D> get_material() const { return material; }
+	void set_material(Ref<StandardMaterial3D> p_material) { material = p_material; }
 
 private:
 	MeshInstance3D* get_chunk(Vector3i chunk_pos);
