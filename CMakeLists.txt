@@ -31,6 +31,10 @@ set(CMAKE_CXX_FLAGS_RELEASE_DEBUG ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
 set(CMAKE_EXE_LINKER_FLAGS_RELEASE_DEBUG ${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO})
 set(CMAKE_SHARED_LINKER_FLAGS_RELEASE_DEBUG ${CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO})
 
+# Set Runtime Library to match the engine build 
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>") # Static Linkage (/MT)
+#set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL") # Dynamic Linkage (/MD)
+
 if(MSVC)
     set(ENGINE_VSPROJ "${GD_ENGINE_DIR}/godot.vcxproj")
 
@@ -62,6 +66,12 @@ set_target_properties(godot-cpp PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY "${GD_CPP_DIR}/bin"
     ARCHIVE_OUTPUT_DIRECTORY_DEV_BUILD "${GD_CPP_DIR}/bin"
     ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${GD_CPP_DIR}/bin"
+	LIBRARY_OUTPUT_DIRECTORY "${GD_CPP_DIR}/bin"
+	LIBRARY_OUTPUT_DIRECTORY_DEV_BUILD "${GD_CPP_DIR}/bin"
+	LIBRARY_OUTPUT_DIRECTORY_RELEASE "${GD_CPP_DIR}/bin"
+	RUNTIME_OUTPUT_DIRECTORY "${GD_CPP_DIR}/bin"
+	RUNTIME_OUTPUT_DIRECTORY_DEV_BUILD "${GD_CPP_DIR}/bin"
+	RUNTIME_OUTPUT_DIRECTORY_RELEASE "${GD_CPP_DIR}/bin"
 )
 
 file(GLOB extension_dirs RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "extensions/*")
@@ -98,7 +108,6 @@ foreach(dir ${extension_dirs})
 				# Only include docs for Editor/Debug builds
 				if(CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo|dev_build")
 					
-					# Use official godot-cpp helper (ensure your godot-cpp version is 4.3+)
 					target_doc_sources(${ext_name}
 						SOURCES ${EXT_DOCS}
 						GEN_CPP "${current_ext_path}/src/gen/doc_data.gen.cpp"
@@ -225,6 +234,16 @@ set_target_properties(${ProjectName} PROPERTIES
 
 # Make Solution Explorer mirror the folder structure
 source_group(TREE "${GD_PROJECT_DIR}" FILES ${GODOT_FILES})
+
+# Warning / Reminder when this cmake is run to build the engine
+if(NOT EXISTS "${GD_ENGINE_EXE}")
+    message(WARNING 
+		" \n"
+        " WARNING: ENGINE EXE NOT FOUND!\n"
+        " Expected at: ${GD_ENGINE_EXE}\n"
+        " Compile the engine with build_engine.bat"
+    )
+endif()
 
 # Set as DEFAULT startup project
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT "${ProjectName}")

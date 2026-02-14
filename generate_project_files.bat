@@ -20,8 +20,8 @@ if exist "%ENGINE_PROJ%" (
     popd
 )
 
-echo [2/3] Generating Master Solution and Extension Projects...
-if not exist "build" mkdir build
+echo [2/3] Generating Master Solution with Extension and Godot Projects...
+echo       Starting CMake...
 cmake -B build -G "Visual Studio 17 2022"
 if %ERRORLEVEL% neq 0 (
     echo ERROR: CMake generation failed.
