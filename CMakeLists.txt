@@ -36,26 +36,26 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>") # Static
 #set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL") # Dynamic Linkage (/MD)
 
 if(MSVC)
-    set(ENGINE_VSPROJ "${GD_ENGINE_DIR}/godot.vcxproj")
+	set(ENGINE_VSPROJ "${GD_ENGINE_DIR}/godot.vcxproj")
 
-    if(EXISTS "${ENGINE_VSPROJ}")
-        message(STATUS "Found Engine Project: Attaching to Solution")
-        include_external_msproject(
-            godot_engine 
-            "${ENGINE_VSPROJ}"
+	if(EXISTS "${ENGINE_VSPROJ}")
+		message(STATUS "Found Engine Project: Attaching to Solution")
+		include_external_msproject(
+			godot_engine 
+			"${ENGINE_VSPROJ}"
 			TYPE vcxproj
-        )
+		)
 		
 		# MAP the Master Solution Config to the Engine Project Config
-        set_target_properties(godot_engine PROPERTIES
-            MAP_IMPORTED_CONFIG_DEV_BUILD "template_debug"
-            MAP_IMPORTED_CONFIG_RELEASE_DEBUG "template_release"
+		set_target_properties(godot_engine PROPERTIES
+			MAP_IMPORTED_CONFIG_DEV_BUILD "template_debug"
+			MAP_IMPORTED_CONFIG_RELEASE_DEBUG "template_release"
 			FOLDER "godot-engine"
-        )
-    else()
-        message(WARNING "Godot Engine project not found at ${ENGINE_VSPROJ}. "
-                        "Run SCons with 'vsproj=yes' in the engine dir to enable engine debugging.")
-    endif()
+		)
+	else()
+		message(WARNING "Godot Engine project not found at ${ENGINE_VSPROJ}. "
+						"Run SCons with 'vsproj=yes' in the engine dir to enable engine debugging.")
+	endif()
 endif()
 
 message(STATUS "Adding godot-cpp subdirectory")
@@ -63,9 +63,9 @@ add_subdirectory(godot-cpp)
 
 # Force godot-cpp to output to its own folder instead of /build
 set_target_properties(godot-cpp PROPERTIES
-    ARCHIVE_OUTPUT_DIRECTORY "${GD_CPP_DIR}/bin"
-    ARCHIVE_OUTPUT_DIRECTORY_DEV_BUILD "${GD_CPP_DIR}/bin"
-    ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${GD_CPP_DIR}/bin"
+	ARCHIVE_OUTPUT_DIRECTORY "${GD_CPP_DIR}/bin"
+	ARCHIVE_OUTPUT_DIRECTORY_DEV_BUILD "${GD_CPP_DIR}/bin"
+	ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${GD_CPP_DIR}/bin"
 	LIBRARY_OUTPUT_DIRECTORY "${GD_CPP_DIR}/bin"
 	LIBRARY_OUTPUT_DIRECTORY_DEV_BUILD "${GD_CPP_DIR}/bin"
 	LIBRARY_OUTPUT_DIRECTORY_RELEASE "${GD_CPP_DIR}/bin"
@@ -79,23 +79,23 @@ file(GLOB extension_dirs RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "extensions/*")
 set(ALL_EXTENSION_TARGETS "") # Initialize list of extension targets
 
 foreach(dir ${extension_dirs})
-    get_filename_component(ext_name ${dir} NAME)
-    
-    set(current_ext_path "${CMAKE_CURRENT_SOURCE_DIR}/extensions/${ext_name}")
-    set(current_ext_src "${CMAKE_CURRENT_SOURCE_DIR}/extensions/${ext_name}/src")
+	get_filename_component(ext_name ${dir} NAME)
+	
+	set(current_ext_path "${CMAKE_CURRENT_SOURCE_DIR}/extensions/${ext_name}")
+	set(current_ext_src "${CMAKE_CURRENT_SOURCE_DIR}/extensions/${ext_name}/src")
 
-    if(IS_DIRECTORY ${current_ext_src})
-        # Use the absolute path for GLOB to avoid confusion
-        file(GLOB_RECURSE SOURCES 
-            "${current_ext_src}/*.cpp" 
-            "${current_ext_src}/*.hpp" 
-            "${current_ext_src}/*.h"
-        )
+	if(IS_DIRECTORY ${current_ext_src})
+		# Use the absolute path for GLOB to avoid confusion
+		file(GLOB_RECURSE SOURCES 
+			"${current_ext_src}/*.cpp" 
+			"${current_ext_src}/*.hpp" 
+			"${current_ext_src}/*.h"
+		)
 
-        if(SOURCES)
+		if(SOURCES)
 			message(STATUS "Adding Extension Project: ${ext_name}")
 		
-            add_library(${ext_name} SHARED ${SOURCES})
+			add_library(${ext_name} SHARED ${SOURCES})
 			list(APPEND ALL_EXTENSION_TARGETS ${ext_name}) # list valid extentions for later use
 
 			# Doc generation
@@ -118,18 +118,18 @@ foreach(dir ${extension_dirs})
 				endif()
 			endif()
 
-            # Organize the IDE View
-            # Put the project in the "Extensions" folder
-            set_target_properties(${ext_name} PROPERTIES FOLDER "Extensions")
-            # Tell VS to mirror the actual folder structure on disk
-            source_group(TREE "${current_ext_path}" FILES ${SOURCES})
+			# Organize the IDE View
+			# Put the project in the "Extensions" folder
+			set_target_properties(${ext_name} PROPERTIES FOLDER "Extensions")
+			# Tell VS to mirror the actual folder structure on disk
+			source_group(TREE "${current_ext_path}" FILES ${SOURCES})
 
-            # Build settings
-            target_link_libraries(${ext_name} PRIVATE godot-cpp)
-            target_include_directories(${ext_name} PRIVATE ${current_ext_src})
+			# Build settings
+			target_link_libraries(${ext_name} PRIVATE godot-cpp)
+			target_include_directories(${ext_name} PRIVATE ${current_ext_src})
 			
 			message(STATUS "Generating .gdextension for ${ext_name}")
-    
+	
 			# Uses the folder name for the libs and entry symbol
 			set(GD_EXT_FILE_CONTENT 
 "[configuration]
@@ -189,31 +189,30 @@ compatibility_minimum = \"${GD_ENGINE_VERSION}\"
 				GDE_ENTRY_NAME=${ext_name}_library_init
 			)
 			
-            set_target_properties(${ext_name} PROPERTIES
-			    FOLDER "extensions"
-                LIBRARY_OUTPUT_DIRECTORY "${GD_EXT_BUILD_OUTPUT_PATH}"
-                RUNTIME_OUTPUT_DIRECTORY "${GD_EXT_BUILD_OUTPUT_PATH}"
+			set_target_properties(${ext_name} PROPERTIES
+				FOLDER "extensions"
+				LIBRARY_OUTPUT_DIRECTORY "${GD_EXT_BUILD_OUTPUT_PATH}"
+				RUNTIME_OUTPUT_DIRECTORY "${GD_EXT_BUILD_OUTPUT_PATH}"
 				# Explicitly set the path for dev_build config
 				RUNTIME_OUTPUT_DIRECTORY_DEV_BUILD "${GD_EXT_BUILD_OUTPUT_PATH}/dev_build" 
-                PREFIX ""
-                VS_DEBUGGER_COMMAND "${GD_ENGINE_EXE}"
-                VS_DEBUGGER_COMMAND_ARGUMENTS "--editor --path \"${GD_PROJECT_DIR}\""
-                VS_DEBUGGER_WORKING_DIRECTORY "${GD_PROJECT_DIR}"
-            )
+				PREFIX ""
+				VS_DEBUGGER_COMMAND "${GD_ENGINE_EXE}"
+				VS_DEBUGGER_COMMAND_ARGUMENTS "--editor --path \"${GD_PROJECT_DIR}\""
+				VS_DEBUGGER_WORKING_DIRECTORY "${GD_PROJECT_DIR}"
+			)
 		else()
 			message(WARNING "No source files found for Extension Project: ${ext_name}. No project will be made")
-        endif()
-    endif()	
+		endif()
+	endif()	
 endforeach()
 
 message(STATUS "Creating project for Godot project")
 
 # Collect all Godot project files for visibility in VS
 file(GLOB_RECURSE GODOT_FILES 
-    "${GD_PROJECT_DIR}/*.gd" 
-    "${GD_PROJECT_DIR}/*.tscn" 
-    "${GD_PROJECT_DIR}/*.godot"
-    "${GD_PROJECT_DIR}/*.tres"
+	"${GD_PROJECT_DIR}/*.gd"
+	"${GD_PROJECT_DIR}/*.glsl"
+	"${GD_PROJECT_DIR}/*.godot"
 )
 
 set(ProjectName "project")
@@ -226,10 +225,10 @@ add_dependencies(${ProjectName} ${ALL_EXTENSION_TARGETS})
 
 # Organize and set as the Startup Project
 set_target_properties(${ProjectName} PROPERTIES 
-    #FOLDER "projects"
-    VS_DEBUGGER_COMMAND "${GD_ENGINE_EXE}"
-    VS_DEBUGGER_WORKING_DIRECTORY "${GD_PROJECT_DIR}"
-    VS_DEBUGGER_COMMAND_ARGUMENTS "--editor --path \".\""
+	#FOLDER "projects"
+	VS_DEBUGGER_COMMAND "${GD_ENGINE_EXE}"
+	VS_DEBUGGER_WORKING_DIRECTORY "${GD_PROJECT_DIR}"
+	VS_DEBUGGER_COMMAND_ARGUMENTS "--editor --path \".\""
 )
 
 # Make Solution Explorer mirror the folder structure
@@ -237,12 +236,12 @@ source_group(TREE "${GD_PROJECT_DIR}" FILES ${GODOT_FILES})
 
 # Warning / Reminder when this cmake is run to build the engine
 if(NOT EXISTS "${GD_ENGINE_EXE}")
-    message(WARNING 
+	message(WARNING 
 		" \n"
-        " WARNING: ENGINE EXE NOT FOUND!\n"
-        " Expected at: ${GD_ENGINE_EXE}\n"
-        " Compile the engine with build_engine.bat"
-    )
+		" WARNING: ENGINE EXE NOT FOUND!\n"
+		" Expected at: ${GD_ENGINE_EXE}\n"
+		" Compile the engine with build_engine.bat"
+	)
 endif()
 
 # Set as DEFAULT startup project
