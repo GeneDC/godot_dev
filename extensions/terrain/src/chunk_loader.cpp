@@ -3,7 +3,8 @@
 #include "chunk_data.h"
 #include "godot_utility.h"
 #include "mesh_generator.h"
-#include "terrain_constants.hpp"
+#include "terrain_constants.h"
+#include "concurrent_chunk_map.h"
 
 #include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/global_constants.hpp>
@@ -29,6 +30,7 @@
 #include <cstdio>
 #include <iterator>
 #include <vector>
+#include <utility>
 
 using namespace godot;
 using namespace terrain_constants;
@@ -180,7 +182,7 @@ void ChunkLoader::_update_chunks(Vector3i centre_pos, int32_t radius)
 	auto threshold_begin_iterator = pending_chunks.begin();
 	do
 	{
-		// Incremental Partition significantally faster than sort
+		// Incremental Partition significantly faster than sort
 		float threshold_squared = threshold * threshold;
 		auto threshold_end_iterator = std::partition(threshold_begin_iterator, pending_chunks.end(),
 				[centre_pos, threshold_squared](const Vector3i& coord)
@@ -232,7 +234,8 @@ void ChunkLoader::_queue_generate_mesh_data(Vector3i chunk_pos, bool prioritise)
 {
 	ChunkData chunk_data = chunk_generator->generate_points(chunk_pos);
 
-	// TODO: Add a map of the chunks. To avoid re-generating, and allow editing.
+	bool mark_dirty = false; // Don't mark dirty it's being queued for meshing immediately.
+	chunk_map.update_chunk(chunk_data, mark_dirty);
 
 	if (chunk_data.surface_state == SurfaceState::MIXED)
 	{

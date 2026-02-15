@@ -1,7 +1,7 @@
 #pragma once
 
 #include "mesh_generator.h"
-#include "safe_queue.hpp"
+#include "safe_queue.h"
 
 #include <godot_cpp/classes/mutex.hpp>
 #include <godot_cpp/classes/ref.hpp>

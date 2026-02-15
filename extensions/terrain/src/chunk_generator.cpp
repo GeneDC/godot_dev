@@ -1,7 +1,7 @@
 #include "chunk_generator.h"
 
 #include "chunk_data.h"
-#include "terrain_constants.hpp"
+#include "terrain_constants.h"
 
 #include <godot_cpp/classes/global_constants.hpp>
 #include <godot_cpp/core/class_db.hpp>

@@ -3,6 +3,7 @@
 #include "chunk_generator.h"
 #include "mesh_generator.h"
 #include "mesh_generator_pool.h"
+#include "concurrent_chunk_map.h"
 
 #include <godot_cpp/classes/mesh_instance3d.hpp>
 #include <godot_cpp/classes/node.hpp>
@@ -51,6 +52,8 @@ private:
 
 	void _update_chunks(Vector3i centre_pos, int32_t radius);
 	void _process_group_chunk(uint32_t p_index);
+
+	ConcurrentChunkMap chunk_map{};
 
 	HashMap<Vector3i, MeshInstance3D*> chunk_node_map{};
 	std::vector<MeshData> mesh_datas{};

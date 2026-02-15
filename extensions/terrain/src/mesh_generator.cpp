@@ -1,7 +1,7 @@
 #include "mesh_generator.h"
 
 #include "godot_utility.h"
-#include "terrain_constants.hpp"
+#include "terrain_constants.h"
 
 #include <godot_cpp/classes/mesh.hpp>
 #include <godot_cpp/classes/os.hpp>

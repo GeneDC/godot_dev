@@ -1,5 +1,7 @@
 #pragma once
 
+#include "chunk_data.h"
+
 #include <godot_cpp/classes/rd_shader_file.hpp>
 #include <godot_cpp/classes/rd_shader_spirv.hpp>
 #include <godot_cpp/classes/ref.hpp>
@@ -7,12 +9,9 @@
 #include <godot_cpp/classes/rendering_device.hpp>
 #include <godot_cpp/classes/wrapped.hpp>
 #include <godot_cpp/variant/array.hpp>
-#include <godot_cpp/variant/packed_float32_array.hpp>
-#include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
 
 #include <cstdint>
-#include "chunk_data.h"
 
 using namespace godot;
 
