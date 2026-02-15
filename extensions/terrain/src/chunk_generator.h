@@ -6,9 +6,10 @@
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/wrapped.hpp>
 #include <godot_cpp/templates/vector.hpp>
-#include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
+
+#include <chunk_data.h>
 
 using namespace godot;
 
@@ -20,7 +21,7 @@ public:
 	ChunkGenerator() = default;
 	~ChunkGenerator() override = default;
 
-	PackedFloat32Array generate_points(Vector3i chunk_pos) const;
+	ChunkData generate_points(Vector3i chunk_pos) const;
 
 	// Modifies where the terrain height should start int base_height_offset;
 	float base_height_offset = 0.0f;

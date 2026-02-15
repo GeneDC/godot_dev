@@ -12,6 +12,7 @@
 #include <godot_cpp/variant/vector3i.hpp>
 
 #include <cstdint>
+#include "chunk_data.h"
 
 using namespace godot;
 
@@ -33,7 +34,7 @@ public:
 	// Call once to setup. Creates local rendering device, loads shader, and setups the buffers and uniforms
 	bool init();
 	// Returns MeshData for a ArrayMesh using the compute shader results.
-	[[nodiscard]] MeshData generate_mesh_data(Vector3i chunk_pos, PackedFloat32Array points);
+	[[nodiscard]] MeshData generate_mesh_data(ChunkData chunk_data);
 
 protected:
 	static void _bind_methods() {};

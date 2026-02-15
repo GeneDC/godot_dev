@@ -1,5 +1,6 @@
 #include "chunk_generator.h"
 
+#include "chunk_data.h"
 #include "terrain_constants.hpp"
 
 #include <godot_cpp/classes/global_constants.hpp>
@@ -20,8 +21,6 @@ using namespace terrain_constants;
 
 void ChunkGenerator::_bind_methods()
 {
-	ClassDB::bind_method(D_METHOD("generate_points", "chunk_pos"), &ChunkGenerator::generate_points);
-
 	ClassDB::bind_method(D_METHOD("get_base_height_offset"), &ChunkGenerator::get_base_height_offset);
 	ClassDB::bind_method(D_METHOD("set_base_height_offset", "base_height_offset"), &ChunkGenerator::set_base_height_offset);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "base_height_offset"), "set_base_height_offset", "get_base_height_offset");
@@ -39,7 +38,7 @@ void ChunkGenerator::_bind_methods()
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "height_multiplier_noise", PROPERTY_HINT_RESOURCE_TYPE, "FastNoiseLite"), "set_height_multiplier_noise", "get_height_multiplier_noise");
 }
 
-PackedFloat32Array ChunkGenerator::generate_points(Vector3i chunk_pos) const
+ChunkData ChunkGenerator::generate_points(Vector3i chunk_pos) const
 {
 	// NOTE: this currently generates a chunk size + 1 array, but a chunk only needs the the chunk size data and the extra data can be added before it's sent to the shader
 
@@ -50,7 +49,7 @@ PackedFloat32Array ChunkGenerator::generate_points(Vector3i chunk_pos) const
 	Vector3 chunk_world_pos = chunk_pos * CHUNK_SIZE;
 
 	Vector<float> height_map = _generate_height_map(POINTS_SIZE, chunk_world_pos);
-
+	float count = 0.0f;
 	for (int x = 0; x < POINTS_SIZE; x++)
 	{
 		for (int z = 0; z < POINTS_SIZE; z++)
@@ -64,13 +63,29 @@ PackedFloat32Array ChunkGenerator::generate_points(Vector3i chunk_pos) const
 				//float density = generate_density(world_pos, height);
 				float value = CLAMP(height - world_pos.y, 0.0f, 1.0f);
 				//value = CLAMP(value - density, 0.0f, 1.0f);
-
+				count += value;
 				points[x + y * POINTS_SIZE + z * POINTS_SIZE * POINTS_SIZE] = value;
 			}
 		}
 	}
 
-	return points;
+	SurfaceState surface_state = SurfaceState::MIXED;
+
+	constexpr float max_count = POINTS_VOLUME;
+	if (count == 0.0f)
+	{
+		surface_state = SurfaceState::EMPTY;
+	}
+	else if (count == max_count)
+	{
+		surface_state = SurfaceState::FULL;
+	}
+
+	return {
+		points,
+		chunk_pos,
+		surface_state
+	};
 }
 
 Vector<float> ChunkGenerator::_generate_height_map(int p_size, const Vector3& p_chunk_world_pos) const

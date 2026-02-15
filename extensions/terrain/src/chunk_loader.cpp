@@ -1,5 +1,6 @@
 #include "chunk_loader.h"
 
+#include "chunk_data.h"
 #include "godot_utility.h"
 #include "mesh_generator.h"
 #include "terrain_constants.hpp"
@@ -9,6 +10,7 @@
 #include <godot_cpp/classes/mesh.hpp>
 #include <godot_cpp/classes/mesh_instance3d.hpp>
 #include <godot_cpp/classes/ref.hpp>
+#include <godot_cpp/classes/standard_material3d.hpp>
 #include <godot_cpp/classes/time.hpp>
 #include <godot_cpp/classes/worker_thread_pool.hpp>
 #include <godot_cpp/core/class_db.hpp>
@@ -24,10 +26,9 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
 #include <iterator>
 #include <vector>
-#include <cstdio>
-#include <godot_cpp/classes/standard_material3d.hpp>
 
 using namespace godot;
 using namespace terrain_constants;
@@ -229,8 +230,15 @@ void ChunkLoader::queue_chunk_update(Vector3i chunk_pos, bool prioritise)
 
 void ChunkLoader::_queue_generate_mesh_data(Vector3i chunk_pos, bool prioritise)
 {
-	PackedFloat32Array points = chunk_generator->generate_points(chunk_pos);
-	mesh_generator_pool->queue_generate_mesh_data(chunk_pos, points, prioritise);
+	ChunkData chunk_data = chunk_generator->generate_points(chunk_pos);
+
+	// TODO: Add a map of the chunks. To avoid re-generating, and allow editing.
+
+	if (chunk_data.surface_state == SurfaceState::MIXED)
+	{
+		mesh_generator_pool->queue_generate_mesh_data(chunk_pos, chunk_data, prioritise);
+	}
+	// If it's empty or full it should be fine to just forget about it and never queue it for meshing.
 }
 
 MeshInstance3D* ChunkLoader::get_chunk(Vector3i chunk_pos)
@@ -269,6 +277,6 @@ void ChunkLoader::_process_group_chunk(uint32_t p_index)
 	Vector3i coord = pending_chunks[p_index];
 	Vector3 centre_pos{}; // TODO: Get the player position here
 	float priority_distance = 2.0f; // TODO: Make configurable
-	bool prioritise = Vector3(coord).distance_squared_to(centre_pos) < priority_distance * priority_distance; 
+	bool prioritise = Vector3(coord).distance_squared_to(centre_pos) < priority_distance * priority_distance;
 	_queue_generate_mesh_data(coord, prioritise);
 }

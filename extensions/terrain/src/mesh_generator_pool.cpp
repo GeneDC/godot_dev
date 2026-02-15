@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <utility>
 #include <vector>
+#include <chunk_data.h>
 
 using namespace godot;
 
@@ -69,7 +70,7 @@ void MeshGeneratorPool::stop()
 	mesh_workers.clear();
 }
 
-void MeshGeneratorPool::queue_generate_mesh_data(Vector3i chunk_pos, PackedFloat32Array points, bool prioritise)
+void MeshGeneratorPool::queue_generate_mesh_data(Vector3i chunk_pos, ChunkData chunk_data, bool prioritise)
 {
 	if (stopping)
 	{
@@ -78,8 +79,7 @@ void MeshGeneratorPool::queue_generate_mesh_data(Vector3i chunk_pos, PackedFloat
 	}
 
 	Task* task = memnew(Task);
-	task->chunk_pos = chunk_pos;
-	task->points = points;
+	task->chunk_data = chunk_data;
 	task_queue.push(task, prioritise);
 }
 
@@ -107,7 +107,7 @@ void MeshGeneratorPool::_thread_loop(uint64_t mesh_worker_index)
 			break;
 		}
 
-		MeshData mesh_data = mesh_worker->mesh_generator->generate_mesh_data(task->chunk_pos, task->points);
+		MeshData mesh_data = mesh_worker->mesh_generator->generate_mesh_data(task->chunk_data);
 		done_mesh_data_mutex->lock();
 		done_mesh_data.push_back(std::move(mesh_data));
 		done_mesh_data_mutex->unlock();

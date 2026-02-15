@@ -12,7 +12,7 @@ func _exit_tree():
 func init() -> void:
 	chunk_loader = get_node("ChunkLoader")
 	chunk_loader.init()
-	chunk_loader.update_chunks(Vector3i.ZERO, 10)
+	chunk_loader.update_chunks(Vector3i.ZERO, 20)
 	
 func _process(_delta_time: float) -> void:
 	chunk_loader.update()

@@ -21,6 +21,7 @@
 #include <cstring>
 #include <utility>
 #include <godot_cpp/variant/packed_vector4_array.hpp>
+#include "chunk_data.h"
 
 using namespace godot;
 using namespace terrain_constants;
@@ -146,10 +147,18 @@ bool MeshGenerator::init()
 	return true;
 }
 
-MeshData MeshGenerator::generate_mesh_data(Vector3i chunk_pos, PackedFloat32Array points)
+MeshData MeshGenerator::generate_mesh_data(ChunkData chunk_data)
 {
 	MeshData mesh_data{};
-	mesh_data.chunk_pos = chunk_pos;
+	mesh_data.chunk_pos = chunk_data.position;
+
+	// No mesh to generate if the chunk is entirely empty or full
+	// TODO: Rework this check when we need to generate with the surrounding chunks
+	if (chunk_data.surface_state != SurfaceState::MIXED)
+	{
+		PRINT_WARNING("Skipping chunk that will have no mesh data. This should be skipped before it gets to the mesh generator.");
+		return mesh_data;
+	}
 
 	if (rendering_thread_id == -1)
 	{
@@ -175,7 +184,7 @@ MeshData MeshGenerator::generate_mesh_data(Vector3i chunk_pos, PackedFloat32Arra
 		return mesh_data;
 	}
 
-	PackedByteArray points_byte_array = points.to_byte_array();
+	PackedByteArray points_byte_array = chunk_data.points.to_byte_array();
 
 	// update the points buffer
 	local_rendering_device->buffer_update(points_buffer, 0, points_byte_array.size(), points_byte_array);

@@ -14,6 +14,7 @@
 #include <atomic>
 #include <cstdint>
 #include <vector>
+#include "chunk_data.h"
 
 using namespace godot;
 
@@ -24,7 +25,7 @@ class MeshGeneratorPool : public RefCounted
 public:
 	void init(uint32_t p_thread_count);
 	void stop();
-	void queue_generate_mesh_data(Vector3i chunk_pos, PackedFloat32Array points, bool prioritise = false);
+	void queue_generate_mesh_data(Vector3i chunk_pos, ChunkData chunk_data, bool prioritise = false);
 
 	[[nodiscard]] std::vector<MeshData> take_done_mesh_data();
 
@@ -34,8 +35,7 @@ protected:
 private:
 	struct Task
 	{
-		Vector3i chunk_pos;
-		PackedFloat32Array points;
+		ChunkData chunk_data;
 	};
 	SafeQueue<Task*> task_queue{};
 
