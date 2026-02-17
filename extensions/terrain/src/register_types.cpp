@@ -2,6 +2,7 @@
 
 #include "chunk_generator.h"
 #include "chunk_loader.h"
+#include "chunk_viewer.h"
 #include "mesh_generator.h"
 #include "mesh_generator_pool.h"
 
@@ -21,6 +22,7 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 	}
 	GDREGISTER_CLASS(ChunkGenerator);
 	GDREGISTER_CLASS(ChunkLoader);
+	GDREGISTER_CLASS(ChunkViewer);
 	GDREGISTER_CLASS(MeshGenerator);
 	GDREGISTER_CLASS(MeshGeneratorPool);
 }

@@ -26,6 +26,7 @@ public:
 	void init(uint32_t p_thread_count);
 	void stop();
 	void queue_generate_mesh_data(Vector3i chunk_pos, ChunkData chunk_data, bool prioritise = false);
+	uint64_t get_task_count() const { return task_queue.get_count(); };
 
 	[[nodiscard]] std::vector<MeshData> take_done_mesh_data();
 

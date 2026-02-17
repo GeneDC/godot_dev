@@ -5,6 +5,7 @@
 #include <godot_cpp/classes/semaphore.hpp>
 
 #include <deque>
+#include <cstdint>
 
 using namespace godot;
 
@@ -14,6 +15,7 @@ class SafeQueue
 public:
 	SafeQueue()
 	{
+		count = 0;
 		mutex.instantiate();
 		semaphore.instantiate();
 	}
@@ -22,9 +24,15 @@ public:
 	{
 		mutex->lock();
 		if (prioritise)
+		{
 			priority_queue.push_back(value);
+			count++;
+		}
 		else
+		{
 			queue.push_back(value);
+			count++;
+		}
 		mutex->unlock();
 
 		semaphore->post();
@@ -41,20 +49,29 @@ public:
 		if (target_queue->empty())
 		{
 			mutex->unlock();
-			return nullptr;
+			return T();
 		}
 
 		T value = target_queue->front();
 		target_queue->pop_front();
+		count--;
 
 		mutex->unlock();
 		return value;
 	}
 
+	uint64_t get_count() const
+	{
+		mutex->lock();
+		uint64_t current_count = count;
+		mutex->unlock();
+		return current_count;
+	}
+
 	bool is_empty()
 	{
 		mutex->lock();
-		bool empty = priority_queue.empty() && queue.empty();
+		bool empty = count == 0;
 		mutex->unlock();
 		return empty;
 	}
@@ -62,6 +79,7 @@ public:
 private:
 	std::deque<T> queue;
 	std::deque<T> priority_queue;
-	Ref<Mutex> mutex;
+	uint64_t count;
+	mutable Ref<Mutex> mutex;
 	Ref<Semaphore> semaphore;
 };

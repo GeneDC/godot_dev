@@ -29,7 +29,10 @@ mesh = SubResource("BoxMesh_2jas5")
 transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 8.495, 100, 5.713)
 script = ExtResource("2_n51mc")
 
-[node name="ChunkLoader" type="ChunkLoader" parent="."]
+[node name="ChunkViewer" type="ChunkViewer" parent="Camera3D"]
+
+[node name="ChunkLoader" type="ChunkLoader" parent="." node_paths=PackedStringArray("chunk_viewer")]
+chunk_viewer = NodePath("../Camera3D/ChunkViewer")
 chunk_generator = SubResource("ChunkGenerator_ugfer")
 material = ExtResource("3_8lvy3")
 

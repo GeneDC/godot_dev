@@ -11,7 +11,6 @@
 #include <godot_cpp/classes/mesh.hpp>
 #include <godot_cpp/classes/mesh_instance3d.hpp>
 #include <godot_cpp/classes/ref.hpp>
-#include <godot_cpp/classes/standard_material3d.hpp>
 #include <godot_cpp/classes/time.hpp>
 #include <godot_cpp/classes/worker_thread_pool.hpp>
 #include <godot_cpp/core/class_db.hpp>
@@ -20,7 +19,6 @@
 #include <godot_cpp/core/property_info.hpp>
 #include <godot_cpp/variant/callable.hpp>
 #include <godot_cpp/variant/callable_method_pointer.hpp>
-#include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/variant.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
@@ -30,7 +28,7 @@
 #include <cstdio>
 #include <iterator>
 #include <vector>
-#include <utility>
+#include <memory>
 
 using namespace godot;
 using namespace terrain_constants;
@@ -40,8 +38,11 @@ void ChunkLoader::_bind_methods()
 	ClassDB::bind_method(D_METHOD("init"), &ChunkLoader::init);
 	ClassDB::bind_method(D_METHOD("update"), &ChunkLoader::update);
 	ClassDB::bind_method(D_METHOD("stop"), &ChunkLoader::stop);
-	ClassDB::bind_method(D_METHOD("update_chunks", "centre_pos", "radius"), &ChunkLoader::update_chunks);
 	ClassDB::bind_method(D_METHOD("queue_chunk_update", "chunk_pos"), &ChunkLoader::queue_chunk_update);
+
+	ClassDB::bind_method(D_METHOD("get_chunk_viewer"), &ChunkLoader::get_chunk_viewer);
+	ClassDB::bind_method(D_METHOD("set_chunk_viewer", "chunk_viewer"), &ChunkLoader::set_chunk_viewer);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "chunk_viewer", PROPERTY_HINT_NODE_TYPE, "ChunkViewer"), "set_chunk_viewer", "get_chunk_viewer");
 
 	ClassDB::bind_method(D_METHOD("get_chunk_generator"), &ChunkLoader::get_chunk_generator);
 	ClassDB::bind_method(D_METHOD("set_chunk_generator", "chunk_generator"), &ChunkLoader::set_chunk_generator);
@@ -66,10 +67,22 @@ bool ChunkLoader::init()
 		return false;
 	}
 
+	if (!chunk_viewer)
+	{
+		PRINT_ERROR("chunk_viewer not set!");
+		return false;
+	}
+
 	if (!mesh_generator_pool.is_valid())
 	{
 		mesh_generator_pool.instantiate();
 		mesh_generator_pool->init(4); // 4 Threads
+	}
+
+	if (!chunk_map)
+	{
+		chunk_map = std::make_shared<ConcurrentChunkMap>();
+		chunk_viewer->chunk_map = chunk_map;
 	}
 
 	return true;
@@ -77,6 +90,8 @@ bool ChunkLoader::init()
 
 void ChunkLoader::update()
 {
+	try_update_chunks();
+
 	uint64_t start_time = Time::get_singleton()->get_ticks_usec();
 	// budget in microseconds: 2000us = 2ms
 	constexpr uint64_t time_budget = 4000;
@@ -141,75 +156,43 @@ void ChunkLoader::stop()
 	mesh_generator_pool->stop(); // Blocks execution until all threads are stopped
 }
 
-void ChunkLoader::update_chunks(Vector3i centre_pos, int32_t radius)
+void ChunkLoader::try_update_chunks()
 {
 	if (current_group_id != WorkerThreadPool::INVALID_TASK_ID)
 	{
 		WorkerThreadPool::get_singleton()->wait_for_group_task_completion(current_group_id);
 	}
 
-	Callable setup_func = callable_mp(this, &ChunkLoader::_update_chunks);
-	WorkerThreadPool::get_singleton()->add_task(setup_func.bind(centre_pos, radius));
+	Callable update_func = callable_mp(this, &ChunkLoader::_update_chunks);
+	WorkerThreadPool::get_singleton()->add_task(update_func);
 }
 
-void ChunkLoader::_update_chunks(Vector3i centre_pos, int32_t radius)
+void ChunkLoader::_update_chunks()
 {
-	pending_chunks.clear();
-	uint64_t side = (static_cast<uint64_t>(radius) * 2) + 1;
-	pending_chunks.reserve(side * side * side);
-
-	float radius_squared = static_cast<float>(radius * radius);
-	for (int32_t x = -radius; x <= radius; ++x)
+	if (!chunk_viewer)
 	{
-		for (int32_t y = -radius; y <= radius; ++y)
-		{
-			for (int32_t z = -radius; z <= radius; ++z)
-			{
-				if (Vector3(x, y, z).length_squared() < radius_squared)
-				{
-					pending_chunks.push_back(centre_pos + Vector3i(x, y, z));
-				}
-			}
-		}
+		PRINT_ERROR("chunk_viewer not set!");
+		return;
 	}
 
-	// Will only sort the chunks under this threshold. Sorting the higher thresholds is significantally more expensive for not much benefit.
-	float fine_sort_threshold = 4.0f; // TODO: Make this variable
-
-	float threshold_increment = 2.0f; // TODO: Make this variable
-	float threshold = threshold_increment;
-	float target_threshold = static_cast<float>(radius);
-	auto threshold_begin_iterator = pending_chunks.begin();
-	do
+	if (mesh_generator_pool->get_task_count() > 32)
 	{
-		// Incremental Partition significantly faster than sort
-		float threshold_squared = threshold * threshold;
-		auto threshold_end_iterator = std::partition(threshold_begin_iterator, pending_chunks.end(),
-				[centre_pos, threshold_squared](const Vector3i& coord)
-				{
-					return centre_pos.distance_squared_to(coord) <= threshold_squared;
-				});
+		// Don't queue chunks if the mesh_generator has enough work
+		// We could still be generating chunks, but until there's chunk unloading and better memory management this is better than causing stutters.
+		return;
+	}
 
-		if (threshold <= fine_sort_threshold)
-		{
-			std::sort(threshold_begin_iterator, threshold_end_iterator,
-					[centre_pos](const Vector3i& a, const Vector3i& b)
-					{
-						return centre_pos.distance_squared_to(a) > centre_pos.distance_squared_to(b);
-					});
-		}
-		threshold_begin_iterator = threshold_end_iterator;
-		threshold += threshold_increment;
-
-	} while (threshold < target_threshold);
-
-	Callable worker_callable = callable_mp(this, &ChunkLoader::_process_group_chunk);
-	current_group_id = WorkerThreadPool::get_singleton()->add_group_task(
-			worker_callable,
-			pending_chunks.size(), // number_of_elements
-			-1, // elements_per_thread, -1 lets Godot decide the best distribution
-			false, // low priority to avoid starving the CPU
-			"ChunkGeneration");
+	chunk_viewer->get_chunk_positions(pending_chunks, 32);
+	if (pending_chunks.size() > 0)
+	{
+		Callable worker_callable = callable_mp(this, &ChunkLoader::_process_group_chunk);
+		current_group_id = WorkerThreadPool::get_singleton()->add_group_task(
+				worker_callable,
+				pending_chunks.size(), // number_of_elements
+				-1, // elements_per_thread, -1 lets Godot decide the best distribution
+				false, // low priority to avoid starving the CPU
+				"ChunkGeneration");
+	}
 }
 
 void ChunkLoader::queue_chunk_update(Vector3i chunk_pos, bool prioritise)
@@ -235,7 +218,7 @@ void ChunkLoader::_queue_generate_mesh_data(Vector3i chunk_pos, bool prioritise)
 	ChunkData chunk_data = chunk_generator->generate_points(chunk_pos);
 
 	bool mark_dirty = false; // Don't mark dirty it's being queued for meshing immediately.
-	chunk_map.update_chunk(chunk_data, mark_dirty);
+	chunk_map->update_chunk(chunk_data, mark_dirty);
 
 	if (chunk_data.surface_state == SurfaceState::MIXED)
 	{
@@ -278,8 +261,6 @@ MeshInstance3D* ChunkLoader::get_chunk(Vector3i chunk_pos)
 void ChunkLoader::_process_group_chunk(uint32_t p_index)
 {
 	Vector3i coord = pending_chunks[p_index];
-	Vector3 centre_pos{}; // TODO: Get the player position here
-	float priority_distance = 2.0f; // TODO: Make configurable
-	bool prioritise = Vector3(coord).distance_squared_to(centre_pos) < priority_distance * priority_distance;
+	bool prioritise = false; // TODO: Set the priority for close and edited chunks
 	_queue_generate_mesh_data(coord, prioritise);
 }

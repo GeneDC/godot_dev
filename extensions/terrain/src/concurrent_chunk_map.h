@@ -4,10 +4,8 @@
 #include "safe_pool.h"
 
 #include <godot_cpp/variant/vector3i.hpp>
-#include <godot_cpp/variant/variant.hpp>
 
 #include <cstdint>
-#include <cstdlib>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
@@ -15,19 +13,27 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
-#include <functional>
 
 using namespace godot;
 
 struct Vector3iHasher
 {
-	int64_t operator()(const godot::Vector3i& vec) const
+	uint64_t operator()(const godot::Vector3i& v) const
 	{
-		// Standard C++ hash combine logic
-		int64_t hash = std::hash<int32_t>{}(vec.x);
-		hash ^= std::hash<int32_t>{}(vec.y) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-		hash ^= std::hash<int32_t>{}(vec.z) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-		return hash;
+		// Support negative positions, and Optimize for even distribution of the shards
+		uint64_t x = static_cast<uint64_t>(v.x);
+		uint64_t y = static_cast<uint64_t>(v.y);
+		uint64_t z = static_cast<uint64_t>(v.z);
+
+		uint64_t h = x * 73856093ULL;
+		h ^= y * 19349663ULL;
+		h ^= z * 83492791ULL;
+
+		// bit-mixer for better shard distribution
+		h ^= h >> 33;
+		h *= 0xff51afd7ed558ccdULL;
+		h ^= h >> 33;
+		return (uint64_t)h;
 	}
 };
 
@@ -41,19 +47,19 @@ private:
 	struct MapShard
 	{
 		std::unordered_map<Vector3i, ChunkPtr, Vector3iHasher> data;
-		std::shared_mutex mutex;
+		std::shared_mutex mutex; // TODO Replace all std::mutex with godot::Mutex for better engine stability and cross-platform support.
 	};
 
-	static constexpr int64_t SHARD_COUNT = 32;
+	static constexpr uint64_t SHARD_COUNT = 32;
 	std::vector<MapShard> shards;
 
 	// Separate list of work for the Compute Thread
 	std::unordered_set<Vector3i, Vector3iHasher> dirty_positions{};
 	std::mutex dirty_mutex{};
 
-	int64_t get_shard(const Vector3i& pos) const
+	uint64_t get_shard(const Vector3i& pos) const
 	{
-		return std::abs(Vector3iHasher()(pos)) % SHARD_COUNT;
+		return Vector3iHasher()(pos) & (SHARD_COUNT - 1);
 	}
 
 public:
@@ -85,6 +91,13 @@ public:
 		return false;
 	}
 
+	bool has_chunk(Vector3i pos)
+	{
+		MapShard& shard = shards[get_shard(pos)];
+		std::shared_lock lock(shard.mutex);
+		return shard.data.contains(pos);
+	}
+
 	void update_chunk(const ChunkData& modified_data, bool mark_dirty = true)
 	{
 		// Create the new ptr before locking
@@ -104,5 +117,12 @@ public:
 			std::lock_guard lock(dirty_mutex);
 			dirty_positions.insert(modified_data.position);
 		}
+	}
+
+	void unload_chunk(Vector3i pos)
+	{
+		MapShard& shard = shards[get_shard(pos)];
+		std::unique_lock lock(shard.mutex);
+		shard.data.erase(pos);
 	}
 };
