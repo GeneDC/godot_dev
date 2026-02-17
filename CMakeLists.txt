@@ -206,43 +206,50 @@ compatibility_minimum = \"${GD_ENGINE_VERSION}\"
 	endif()	
 endforeach()
 
-message(STATUS "Creating project for Godot project")
+function(add_godot_project TARGET_NAME EXTRA_ARGS)
+	message(STATUS "Creating project for Godot project")
 
-# Collect all Godot project files for visibility in VS
-file(GLOB_RECURSE GODOT_FILES 
-	"${GD_PROJECT_DIR}/*.gd"
-	"${GD_PROJECT_DIR}/*.glsl"
-	"${GD_PROJECT_DIR}/*.godot"
-)
-
-set(ProjectName "project")
-
-# Create a "Utility" target (no compilation)
-add_custom_target(${ProjectName} SOURCES ${GODOT_FILES})
-
-# add extention dependencies. TODO: make this defined per project
-add_dependencies(${ProjectName} ${ALL_EXTENSION_TARGETS})
-
-# Organize and set as the Startup Project
-set_target_properties(${ProjectName} PROPERTIES 
-	#FOLDER "projects"
-	VS_DEBUGGER_COMMAND "${GD_ENGINE_EXE}"
-	VS_DEBUGGER_WORKING_DIRECTORY "${GD_PROJECT_DIR}"
-	VS_DEBUGGER_COMMAND_ARGUMENTS "--editor --path \".\""
-)
-
-# Make Solution Explorer mirror the folder structure
-source_group(TREE "${GD_PROJECT_DIR}" FILES ${GODOT_FILES})
-
-# Warning / Reminder when this cmake is run to build the engine
-if(NOT EXISTS "${GD_ENGINE_EXE}")
-	message(WARNING 
-		" \n"
-		" WARNING: ENGINE EXE NOT FOUND!\n"
-		" Expected at: ${GD_ENGINE_EXE}\n"
-		" Compile the engine with build_engine.bat"
+	# Collect all Godot project files for visibility in VS
+	file(GLOB_RECURSE GODOT_FILES 
+		"${GD_PROJECT_DIR}/*.gd"
+		"${GD_PROJECT_DIR}/*.glsl"
+		"${GD_PROJECT_DIR}/*.godot"
 	)
-endif()
+
+	# Create a "Utility" target (no compilation)
+	add_custom_target(${TARGET_NAME} SOURCES ${GODOT_FILES})
+
+	# add extention dependencies. TODO: make this defined per project
+	add_dependencies(${TARGET_NAME} ${ALL_EXTENSION_TARGETS})
+
+	# Organize and set as the Startup Project
+	set_target_properties(${TARGET_NAME} PROPERTIES 
+		#FOLDER "projects"
+		VS_DEBUGGER_COMMAND "${GD_ENGINE_EXE}"
+		VS_DEBUGGER_WORKING_DIRECTORY "${GD_PROJECT_DIR}"
+		VS_DEBUGGER_COMMAND_ARGUMENTS "--path \".\" ${EXTRA_ARGS}"
+	)
+
+	# Make Solution Explorer mirror the folder structure
+	source_group(TREE "${GD_PROJECT_DIR}" FILES ${GODOT_FILES})
+
+	# Warning / Reminder when this cmake is run to build the engine
+	if(NOT EXISTS "${GD_ENGINE_EXE}")
+		message(WARNING 
+			" \n"
+			" WARNING: ENGINE EXE NOT FOUND!\n"
+			" Expected at: ${GD_ENGINE_EXE}\n"
+			" Compile the engine with build_engine.bat"
+		)
+	endif()
+endfunction()
+
+function(add_godot_project_launch_targets TARGET_NAME)
+	add_godot_project("${TARGET_NAME}_editor" "--editor")
+	add_godot_project("${TARGET_NAME}_game" "")
+endfunction()
+
+add_godot_project_launch_targets("project")
 
 # Set as DEFAULT startup project
-set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT "${ProjectName}")
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT "${ProjectName}_editor")
