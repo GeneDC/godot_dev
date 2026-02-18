@@ -5,17 +5,28 @@
 #include "chunk_viewer.h"
 #include "mesh_generator.h"
 #include "mesh_generator_pool.h"
+#include "terrain_performance_monitor.h"
 
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/defs.hpp>
+#include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/godot.hpp>
 
 #include <gdextension_interface.h>
 
 using namespace godot;
 
+static TerrainPerformanceMonitor* _terrain_performance_monitor_instance = nullptr;
+
 void initialize_gdextension_types(ModuleInitializationLevel p_level)
 {
+	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE)
+	{
+		GDREGISTER_CLASS(TerrainPerformanceMonitor);
+		_terrain_performance_monitor_instance = memnew(TerrainPerformanceMonitor);
+		_terrain_performance_monitor_instance->initialize();
+	}
+
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE)
 	{
 		return;
@@ -29,6 +40,12 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 
 void uninitialize_gdextension_types(ModuleInitializationLevel p_level)
 {
+	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE)
+	{
+		_terrain_performance_monitor_instance->uninitialize();
+		memdelete(_terrain_performance_monitor_instance);
+		_terrain_performance_monitor_instance = nullptr;
+	}
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE)
 	{
 		return;

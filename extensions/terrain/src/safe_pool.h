@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <new>
@@ -66,6 +67,8 @@ public:
 		// Make this pointer return to the pool instead of deleting
 		return Ptr(raw_ptr, PoolDeleter{ this->shared_from_this() });
 	}
+
+	uint64_t size() const { return pool.size(); }
 
 private:
 	void release(T* ptr)

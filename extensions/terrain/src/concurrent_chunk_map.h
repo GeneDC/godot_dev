@@ -47,7 +47,7 @@ private:
 	struct MapShard
 	{
 		std::unordered_map<Vector3i, ChunkPtr, Vector3iHasher> data;
-		std::shared_mutex mutex; // TODO Replace all std::mutex with godot::Mutex for better engine stability and cross-platform support.
+		mutable std::shared_mutex mutex; // TODO Replace all std::mutex with godot::Mutex for better engine stability and cross-platform support.
 	};
 
 	static constexpr uint64_t SHARD_COUNT = 32;
@@ -124,5 +124,21 @@ public:
 		MapShard& shard = shards[get_shard(pos)];
 		std::unique_lock lock(shard.mutex);
 		shard.data.erase(pos);
+	}
+
+	uint64_t get_loaded_count() const
+	{
+		uint64_t count = 0;
+		for (const auto& shard : shards)
+		{
+			std::shared_lock lock(shard.mutex);
+			count += shard.data.size();
+		}
+		return count;
+	}
+
+	uint64_t get_pool_size() const
+	{
+		return chunk_data_pool->size();
 	}
 };

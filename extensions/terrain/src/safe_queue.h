@@ -15,7 +15,6 @@ class SafeQueue
 public:
 	SafeQueue()
 	{
-		count = 0;
 		mutex.instantiate();
 		semaphore.instantiate();
 	}
@@ -23,19 +22,25 @@ public:
 	void push(T value, bool prioritise = false)
 	{
 		mutex->lock();
-		if (prioritise)
-		{
-			priority_queue.push_back(value);
-			count++;
-		}
-		else
-		{
-			queue.push_back(value);
-			count++;
-		}
+		std::deque<T>& target_queue = prioritise ? priority_queue : queue;
+		target_queue.push_back(value);
 		mutex->unlock();
 
 		semaphore->post();
+	}
+
+	void push(const std::vector<T>& values, bool prioritise = false)
+	{
+		mutex->lock();
+
+		std::deque<T>& target_queue = prioritise ? priority_queue : queue;
+		for (const T& value : values)
+		{
+			target_queue.push_back(value);
+			semaphore->post();
+		}
+
+		mutex->unlock();
 	}
 
 	T pop_blocking()
@@ -54,7 +59,6 @@ public:
 
 		T value = target_queue->front();
 		target_queue->pop_front();
-		count--;
 
 		mutex->unlock();
 		return value;
@@ -63,7 +67,7 @@ public:
 	uint64_t get_count() const
 	{
 		mutex->lock();
-		uint64_t current_count = count;
+		uint64_t current_count = priority_queue.size() + queue.size();
 		mutex->unlock();
 		return current_count;
 	}
@@ -71,7 +75,7 @@ public:
 	bool is_empty()
 	{
 		mutex->lock();
-		bool empty = count == 0;
+		bool empty = priority_queue.empty() && queue.empty();
 		mutex->unlock();
 		return empty;
 	}
@@ -79,7 +83,6 @@ public:
 private:
 	std::deque<T> queue;
 	std::deque<T> priority_queue;
-	uint64_t count;
 	mutable Ref<Mutex> mutex;
 	Ref<Semaphore> semaphore;
 };

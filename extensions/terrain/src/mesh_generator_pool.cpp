@@ -50,8 +50,8 @@ void MeshGeneratorPool::stop()
 
 	for (MeshWorker* mesh_worker : mesh_workers)
 	{
-		// Add null tasks to wake up the threads
-		task_queue.push(nullptr);
+		// Add empty tasks to wake up the threads
+		task_queue.push(ChunkData());
 	}
 
 	for (Ref<Thread> thread : threads)
@@ -70,7 +70,7 @@ void MeshGeneratorPool::stop()
 	mesh_workers.clear();
 }
 
-void MeshGeneratorPool::queue_generate_mesh_data(Vector3i chunk_pos, ChunkData chunk_data, bool prioritise)
+void MeshGeneratorPool::queue_generate_mesh_data(ChunkData chunk_data, bool prioritise)
 {
 	if (stopping)
 	{
@@ -78,9 +78,18 @@ void MeshGeneratorPool::queue_generate_mesh_data(Vector3i chunk_pos, ChunkData c
 		return;
 	}
 
-	Task* task = memnew(Task);
-	task->chunk_data = chunk_data;
-	task_queue.push(task, prioritise);
+	task_queue.push(chunk_data, prioritise);
+}
+
+void MeshGeneratorPool::queue_generate_mesh_data(std::vector<ChunkData> chunk_data, bool prioritise)
+{
+	if (stopping)
+	{
+		PRINT_ERROR("MeshGeneratorPool is stopping. Mesh generate will be skipped.");
+		return;
+	}
+
+	task_queue.push(chunk_data, prioritise);
 }
 
 std::vector<MeshData> MeshGeneratorPool::take_done_mesh_data()
@@ -100,19 +109,17 @@ void MeshGeneratorPool::_thread_loop(uint64_t mesh_worker_index)
 
 	while (!stopping)
 	{
-		Task* task = task_queue.pop_blocking();
+		ChunkData chunk_data = task_queue.pop_blocking();
 
-		if (!task || stopping)
+		if (stopping)
 		{
 			break;
 		}
 
-		MeshData mesh_data = mesh_worker->mesh_generator->generate_mesh_data(task->chunk_data);
+		MeshData mesh_data = mesh_worker->mesh_generator->generate_mesh_data(chunk_data);
 		done_mesh_data_mutex->lock();
 		done_mesh_data.push_back(std::move(mesh_data));
 		done_mesh_data_mutex->unlock();
-
-		memdelete(task);
 	}
 	mesh_worker->mesh_generator.unref();
 }

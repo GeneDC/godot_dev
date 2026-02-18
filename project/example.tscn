@@ -1,8 +1,9 @@
-[gd_scene load_steps=8 format=3 uid="uid://dh0oj81pufivs"]
+[gd_scene load_steps=9 format=3 uid="uid://dh0oj81pufivs"]
 
 [ext_resource type="Script" uid="uid://bi504r0doyid6" path="res://scripts/example.gd" id="1_n51mc"]
 [ext_resource type="Script" uid="uid://c7561n2mnt1m4" path="res://scripts/FreeCamera.gd" id="2_n51mc"]
 [ext_resource type="Material" uid="uid://dfwk5so37pjkp" path="res://Materials/ChunkMaterial.tres" id="3_8lvy3"]
+[ext_resource type="Script" uid="uid://cm1jnkm23gurv" path="res://scripts/on_screen_stats.gd" id="4_wcwec"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_2jas5"]
 
@@ -26,7 +27,7 @@ transform = Transform3D(20, 0, 0, 0, 20, 0, 0, 0, 20, 0.8409251, 0.10449457, 0)
 mesh = SubResource("BoxMesh_2jas5")
 
 [node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 8.495, 100, 5.713)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.495, 20, 5.713)
 script = ExtResource("2_n51mc")
 
 [node name="ChunkViewer" type="ChunkViewer" parent="Camera3D"]
@@ -38,3 +39,10 @@ material = ExtResource("3_8lvy3")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, -0.3391156, 0.9407447, 0, -0.9407447, -0.3391156, 0.8409251, 52.441833, 0)
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+script = ExtResource("4_wcwec")
+
+[node name="Label" type="Label" parent="CanvasLayer"]
+offset_right = 40.0
+offset_bottom = 23.0

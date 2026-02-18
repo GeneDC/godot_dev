@@ -48,5 +48,5 @@ protected:
 	void set_height_multiplier_noise(Ref<FastNoiseLite> p_height_multiplier_noise) { height_multiplier_noise = p_height_multiplier_noise; }
 
 private:
-	Vector<float> _generate_height_map(int p_size, const Vector3& p_chunk_world_pos) const;
+	Vector<float> _generate_height_map(const Vector3& p_chunk_world_pos) const;
 };

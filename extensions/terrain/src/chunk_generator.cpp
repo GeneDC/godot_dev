@@ -3,18 +3,17 @@
 #include "chunk_data.h"
 #include "terrain_constants.h"
 
+#include <godot_cpp/classes/fast_noise_lite.hpp>
 #include <godot_cpp/classes/global_constants.hpp>
 #include <godot_cpp/core/class_db.hpp>
-#include <godot_cpp/core/defs.hpp>
-#include <godot_cpp/core/object.hpp>
 #include <godot_cpp/core/print_string.hpp>
 #include <godot_cpp/core/property_info.hpp>
 #include <godot_cpp/templates/vector.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/variant.hpp>
-#include <godot_cpp/variant/vector2.hpp>
-#include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
+#include <godot_cpp/core/object.hpp>
+#include <godot_cpp/variant/vector3.hpp>
 
 using namespace godot;
 using namespace terrain_constants;
@@ -45,26 +44,33 @@ ChunkData ChunkGenerator::generate_points(Vector3i chunk_pos) const
 	PackedFloat32Array points{};
 	points.resize(POINTS_VOLUME);
 	points.fill(0.0f);
+	float* points_ptr = points.ptrw();
 
 	Vector3 chunk_world_pos = chunk_pos * CHUNK_SIZE;
 
-	Vector<float> height_map = _generate_height_map(POINTS_SIZE, chunk_world_pos);
+	Vector<float> height_map = _generate_height_map(chunk_world_pos);
+	const float* height_map_ptr = height_map.ptr();
+
 	float count = 0.0f;
 	for (int x = 0; x < POINTS_SIZE; x++)
 	{
+		const int world_x = x + chunk_world_pos.x;
 		for (int z = 0; z < POINTS_SIZE; z++)
 		{
-			float height = height_map[x + z * POINTS_SIZE];
+			float height = height_map_ptr[x + z * POINTS_SIZE];
+			const int world_z = z + chunk_world_pos.z;
 
 			for (int y = 0; y < POINTS_SIZE; y++)
 			{
-				Vector3 world_pos = chunk_world_pos + Vector3(x, y, z);
+				const int world_y = y + chunk_world_pos.y;
 
 				//float density = generate_density(world_pos, height);
-				float value = CLAMP(height - world_pos.y, 0.0f, 1.0f);
+				float value = height - world_y;
+				value = (value < 0.0f) ? 0.0f : (value > 1.0f ? 1.0f : value); // CLAMP 0-1
 				//value = CLAMP(value - density, 0.0f, 1.0f);
+
 				count += value;
-				points[x + y * POINTS_SIZE + z * POINTS_SIZE * POINTS_SIZE] = value;
+				points_ptr[x + y * POINTS_SIZE + z * POINTS_AREA] = value;
 			}
 		}
 	}
@@ -75,10 +81,12 @@ ChunkData ChunkGenerator::generate_points(Vector3i chunk_pos) const
 	if (count == 0.0f)
 	{
 		surface_state = SurfaceState::EMPTY;
+		points = PackedFloat32Array();
 	}
 	else if (count == max_count)
 	{
 		surface_state = SurfaceState::FULL;
+		points = PackedFloat32Array();
 	}
 
 	return {
@@ -88,10 +96,11 @@ ChunkData ChunkGenerator::generate_points(Vector3i chunk_pos) const
 	};
 }
 
-Vector<float> ChunkGenerator::_generate_height_map(int p_size, const Vector3& p_chunk_world_pos) const
+Vector<float> ChunkGenerator::_generate_height_map(const Vector3& p_chunk_world_pos) const
 {
 	Vector<float> height_map = Vector<float>();
-	height_map.resize(p_size * p_size);
+
+	height_map.resize(POINTS_AREA);
 
 	if (!height_base_noise.is_valid())
 	{
@@ -106,18 +115,20 @@ Vector<float> ChunkGenerator::_generate_height_map(int p_size, const Vector3& p_
 	}
 
 	// Use the internal pointers to avid the overhead of the Ref<>
-	//FastNoiseLite* height_base_noise_ptr = height_base_noise.ptr();
-	//FastNoiseLite* height_multiplier_noise_ptr = height_multiplier_noise.ptr();
+	FastNoiseLite* height_base_noise_ptr = height_base_noise.ptr();
+	FastNoiseLite* height_multiplier_noise_ptr = height_multiplier_noise.ptr();
 
-	for (int x = 0; x < p_size; x++)
+	float* height_map_ptr = height_map.ptrw();
+	for (int x = 0; x < POINTS_SIZE; x++)
 	{
-		for (int z = 0; z < p_size; z++)
+		const int world_x = p_chunk_world_pos.x + x;
+		for (int z = 0; z < POINTS_SIZE; z++)
 		{
-			Vector2 pos = Vector2(x + p_chunk_world_pos.x, z + p_chunk_world_pos.z);
-			float height_offset = base_height_offset + 100 * height_multiplier_noise->get_noise_2dv(pos);
-			float height_base = height_base_noise->get_noise_2dv(pos);
+			const int world_z = p_chunk_world_pos.z + z;
+			float height_offset = base_height_offset + 100 * height_multiplier_noise_ptr->get_noise_2d(world_x, world_z);
+			float height_base = height_base_noise_ptr->get_noise_2d(world_x, world_z);
 			float height = height_offset + height_base * base_height_multiplier;
-			height_map.set(x + z * p_size, height);
+			height_map_ptr[x + z * POINTS_SIZE] = height;
 		}
 	}
 

@@ -25,8 +25,16 @@ class MeshGeneratorPool : public RefCounted
 public:
 	void init(uint32_t p_thread_count);
 	void stop();
-	void queue_generate_mesh_data(Vector3i chunk_pos, ChunkData chunk_data, bool prioritise = false);
+	void queue_generate_mesh_data(ChunkData chunk_data, bool prioritise = false);
+	void queue_generate_mesh_data(std::vector<ChunkData> chunk_data, bool prioritise = false);
 	uint64_t get_task_count() const { return task_queue.get_count(); };
+	uint64_t get_done_mesh_data_count() const
+	{
+		done_mesh_data_mutex->lock();
+		uint64_t result = done_mesh_data.size();
+		done_mesh_data_mutex->unlock();
+		return result;
+	};
 
 	[[nodiscard]] std::vector<MeshData> take_done_mesh_data();
 
@@ -34,11 +42,7 @@ protected:
 	static void _bind_methods() {};
 
 private:
-	struct Task
-	{
-		ChunkData chunk_data;
-	};
-	SafeQueue<Task*> task_queue{};
+	SafeQueue<ChunkData> task_queue{};
 
 	struct MeshWorker
 	{
@@ -49,7 +53,7 @@ private:
 
 	std::atomic<bool> stopping{ false };
 
-	Ref<Mutex> done_mesh_data_mutex;
+	mutable Ref<Mutex> done_mesh_data_mutex;
 	std::vector<MeshData> done_mesh_data{};
 
 	void _thread_loop(uint64_t mesh_worker_index);

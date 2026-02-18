@@ -36,6 +36,10 @@ public:
 	Ref<MeshGeneratorPool> mesh_generator_pool;
 	ChunkViewer* chunk_viewer = nullptr; // TODO: Use a ObjectID instead. Using raw pointer isn't safe as it could become dangling.
 
+	std::weak_ptr<ConcurrentChunkMap> get_chunk_map() const { return chunk_map; }
+	uint64_t get_pending_chunks_count() const;
+	uint64_t get_mesh_datas_count() const { return mesh_datas.size(); }
+
 	Ref<StandardMaterial3D> material;
 
 protected:
@@ -64,6 +68,9 @@ private:
 	HashMap<Vector3i, MeshInstance3D*> chunk_node_map{};
 	std::vector<MeshData> mesh_datas{};
 
+	std::vector<ChunkData> chunk_datas{};
+	std::mutex chunk_datas_mutex;
+
 	std::vector<Vector3i> pending_chunks;
-	WorkerThreadPool::TaskID current_group_id = WorkerThreadPool::INVALID_TASK_ID;
+	WorkerThreadPool::TaskID task_group_id = WorkerThreadPool::INVALID_TASK_ID;
 };
