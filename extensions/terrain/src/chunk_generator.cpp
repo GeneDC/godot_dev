@@ -6,14 +6,15 @@
 #include <godot_cpp/classes/fast_noise_lite.hpp>
 #include <godot_cpp/classes/global_constants.hpp>
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/core/object.hpp>
 #include <godot_cpp/core/print_string.hpp>
 #include <godot_cpp/core/property_info.hpp>
-#include <godot_cpp/templates/vector.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/variant.hpp>
-#include <godot_cpp/variant/vector3i.hpp>
-#include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/vector3.hpp>
+#include <godot_cpp/variant/vector3i.hpp>
+
+#include <cstring>
 
 using namespace godot;
 using namespace terrain_constants;
@@ -37,19 +38,26 @@ void ChunkGenerator::_bind_methods()
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "height_multiplier_noise", PROPERTY_HINT_RESOURCE_TYPE, "FastNoiseLite"), "set_height_multiplier_noise", "get_height_multiplier_noise");
 }
 
+thread_local float ChunkGenerator::tl_points[terrain_constants::POINTS_VOLUME];
+
 ChunkData ChunkGenerator::generate_points(Vector3i chunk_pos) const
 {
-	// NOTE: this currently generates a chunk size + 1 array, but a chunk only needs the the chunk size data and the extra data can be added before it's sent to the shader
+	// NOTE: this currently generates a chunk size + 1 array, but a chunk only needs the chunk size data and the extra data can be added before it's sent to the shader
 
-	PackedFloat32Array points{};
-	points.resize(POINTS_VOLUME);
-	points.fill(0.0f);
-	float* points_ptr = points.ptrw();
+	float* points_ptr = tl_points;
 
 	Vector3 chunk_world_pos = chunk_pos * CHUNK_SIZE;
 
-	Vector<float> height_map = _generate_height_map(chunk_world_pos);
-	const float* height_map_ptr = height_map.ptr();
+	bool did_generate_height_map = generate_height_map(chunk_world_pos);
+	if (!did_generate_height_map)
+	{
+		return {
+			get_empty_points(),
+			chunk_pos,
+			SurfaceState::EMPTY
+		};
+	}
+	const float* height_map_ptr = tl_height_map;
 
 	float count = 0.0f;
 	for (int x = 0; x < POINTS_SIZE; x++)
@@ -75,50 +83,55 @@ ChunkData ChunkGenerator::generate_points(Vector3i chunk_pos) const
 		}
 	}
 
-	SurfaceState surface_state = SurfaceState::MIXED;
-
-	constexpr float max_count = POINTS_VOLUME;
 	if (count == 0.0f)
 	{
-		surface_state = SurfaceState::EMPTY;
-		points = PackedFloat32Array();
+		return {
+			get_empty_points(),
+			chunk_pos,
+			SurfaceState::EMPTY
+		};
 	}
-	else if (count == max_count)
+	else if (count == POINTS_VOLUME)
 	{
-		surface_state = SurfaceState::FULL;
-		points = PackedFloat32Array();
+		return {
+			get_full_points(),
+			chunk_pos,
+			SurfaceState::FULL
+		};
 	}
 
+	// Copy the array to the godot type
+	PackedFloat32Array points_array;
+	points_array.resize(POINTS_VOLUME);
+	std::memcpy(points_array.ptrw(), tl_points, POINTS_VOLUME * sizeof(float));
 	return {
-		points,
+		points_array,
 		chunk_pos,
-		surface_state
+		SurfaceState::MIXED
 	};
 }
 
-Vector<float> ChunkGenerator::_generate_height_map(const Vector3& p_chunk_world_pos) const
-{
-	Vector<float> height_map = Vector<float>();
+thread_local float ChunkGenerator::tl_height_map[POINTS_AREA];
 
-	height_map.resize(POINTS_AREA);
+bool ChunkGenerator::generate_height_map(const Vector3& p_chunk_world_pos) const
+{
+	// Use pointer to avoid overhead of accessing thread memory
+	float* height_map_ptr = tl_height_map;
 
 	if (!height_base_noise.is_valid())
 	{
 		print_error("height_base_noise is invalid");
-		return height_map;
 	}
 
 	if (!height_multiplier_noise.is_valid())
 	{
 		print_error("height_multiplier_noise is invalid");
-		return height_map;
 	}
 
 	// Use the internal pointers to avid the overhead of the Ref<>
 	FastNoiseLite* height_base_noise_ptr = height_base_noise.ptr();
 	FastNoiseLite* height_multiplier_noise_ptr = height_multiplier_noise.ptr();
 
-	float* height_map_ptr = height_map.ptrw();
 	for (int x = 0; x < POINTS_SIZE; x++)
 	{
 		const int world_x = p_chunk_world_pos.x + x;
@@ -132,5 +145,31 @@ Vector<float> ChunkGenerator::_generate_height_map(const Vector3& p_chunk_world_
 		}
 	}
 
-	return height_map;
+	return true;
+}
+
+PackedFloat32Array ChunkGenerator::get_empty_points() const
+{
+	static PackedFloat32Array empty_points;
+
+	if (empty_points.size() == 0)
+	{
+		empty_points.resize(POINTS_VOLUME);
+		empty_points.fill(0.0f);
+	}
+
+	return empty_points;
+}
+
+PackedFloat32Array ChunkGenerator::get_full_points() const
+{
+	static PackedFloat32Array full_points;
+
+	if (full_points.size() == 0)
+	{
+		full_points.resize(POINTS_VOLUME);
+		full_points.fill(1.0f);
+	}
+
+	return full_points;
 }

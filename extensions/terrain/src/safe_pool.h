@@ -36,8 +36,9 @@ private:
 		}
 	};
 
-public:
 	SafePool() = default;
+
+public:
 	// Create the pool with a shared pointer so the deleter can return to it
 	static std::shared_ptr<SafePool<T>> create()
 	{
