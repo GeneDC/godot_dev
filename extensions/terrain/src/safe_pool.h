@@ -1,15 +1,18 @@
 #pragma once
 
+#include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/core/defs.hpp>
+
 #include <cstdint>
 #include <memory>
 #include <mutex>
 #include <new>
 #include <vector>
-
-using namespace godot;
+#include <atomic>
 
 /**
- * @brief *
+ * @brief A thread safe object pool
  * Uses RAII-based automatic recycling:
  * when a 'SafePool::Ptr' goes out of scope, the object is automatically
  * returned to the pool rather than being deleted.
@@ -67,6 +70,15 @@ public:
 
 		// Make this pointer return to the pool instead of deleting
 		return Ptr(raw_ptr, PoolDeleter{ this->shared_from_this() });
+	}
+
+	void pre_alocate(uint64_t count)
+	{
+		std::lock_guard<std::mutex> lock(mutex);
+		for (uint64_t i = 0; i < count; i++)
+		{
+			pool.push_back(std::unique_ptr<T>(new T()));
+		}
 	}
 
 	uint64_t size() const { return pool.size(); }

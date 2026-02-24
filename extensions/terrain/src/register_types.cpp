@@ -6,6 +6,7 @@
 #include "mesh_generator.h"
 #include "mesh_generator_pool.h"
 #include "terrain_performance_monitor.h"
+#include "thread_pool.h"
 
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/defs.hpp>
@@ -22,7 +23,7 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 {
 	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE)
 	{
-		GDREGISTER_CLASS(TerrainPerformanceMonitor);
+		GDREGISTER_CLASS(TerrainPerformanceMonitor)
 		_terrain_performance_monitor_instance = memnew(TerrainPerformanceMonitor);
 		_terrain_performance_monitor_instance->initialize();
 	}
@@ -31,11 +32,13 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 	{
 		return;
 	}
-	GDREGISTER_CLASS(ChunkGenerator);
-	GDREGISTER_CLASS(ChunkLoader);
-	GDREGISTER_CLASS(ChunkViewer);
-	GDREGISTER_CLASS(MeshGenerator);
-	GDREGISTER_CLASS(MeshGeneratorPool);
+	GDREGISTER_CLASS(ChunkGeneratorSettings)
+	GDREGISTER_CLASS(ChunkGenerator)
+	GDREGISTER_CLASS(ChunkLoader)
+	GDREGISTER_CLASS(ChunkViewer)
+	GDREGISTER_CLASS(MeshGenerator)
+	GDREGISTER_CLASS(MeshGeneratorPool)
+	GDREGISTER_CLASS(ThreadPoolBase)
 }
 
 void uninitialize_gdextension_types(ModuleInitializationLevel p_level)

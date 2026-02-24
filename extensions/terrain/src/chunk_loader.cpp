@@ -1,11 +1,14 @@
 #include "chunk_loader.h"
 
 #include "chunk_data.h"
+#include "chunk_generator.h"
 #include "concurrent_chunk_map.h"
 #include "godot_utility.h"
 #include "mesh_generator.h"
+#include "mesh_generator_pool.h"
 #include "terrain_constants.h"
 #include "terrain_performance_monitor.h"
+#include "thread_pool.h"
 
 #include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/global_constants.hpp>
@@ -34,30 +37,25 @@
 using namespace godot;
 using namespace terrain_constants;
 
-uint64_t ChunkLoader::get_pending_chunks_count() const
-{
-	uint64_t result = 0;
-	if (task_group_id != WorkerThreadPool::INVALID_TASK_ID)
-	{
-		result += pending_chunks.size() - WorkerThreadPool::get_singleton()->get_group_processed_element_count(task_group_id);
-	}
-	return result;
-}
-
 void ChunkLoader::_bind_methods()
 {
 	ClassDB::bind_method(D_METHOD("init"), &ChunkLoader::init);
 	ClassDB::bind_method(D_METHOD("update"), &ChunkLoader::update);
 	ClassDB::bind_method(D_METHOD("stop"), &ChunkLoader::stop);
-	ClassDB::bind_method(D_METHOD("queue_chunk_update", "chunk_pos"), &ChunkLoader::queue_chunk_update);
+
+	ClassDB::bind_method(D_METHOD("unload_all"), &ChunkLoader::unload_all);
+
+	ClassDB::bind_method(D_METHOD("can_init"), &ChunkLoader::can_init);
+	ClassDB::bind_method(D_METHOD("can_update"), &ChunkLoader::can_update);
+	ClassDB::bind_method(D_METHOD("can_stop"), &ChunkLoader::can_stop);
 
 	ClassDB::bind_method(D_METHOD("get_chunk_viewer"), &ChunkLoader::get_chunk_viewer);
 	ClassDB::bind_method(D_METHOD("set_chunk_viewer", "chunk_viewer"), &ChunkLoader::set_chunk_viewer);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "chunk_viewer", PROPERTY_HINT_NODE_TYPE, "ChunkViewer"), "set_chunk_viewer", "get_chunk_viewer");
 
-	ClassDB::bind_method(D_METHOD("get_chunk_generator"), &ChunkLoader::get_chunk_generator);
-	ClassDB::bind_method(D_METHOD("set_chunk_generator", "chunk_generator"), &ChunkLoader::set_chunk_generator);
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "chunk_generator", PROPERTY_HINT_RESOURCE_TYPE, "ChunkGenerator"), "set_chunk_generator", "get_chunk_generator");
+	ClassDB::bind_method(D_METHOD("get_chunk_generator_settings"), &ChunkLoader::get_chunk_generator_settings);
+	ClassDB::bind_method(D_METHOD("set_chunk_generator_settings", "chunk_generator_settings"), &ChunkLoader::set_chunk_generator_settings);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "chunk_generator_settings", PROPERTY_HINT_RESOURCE_TYPE, "ChunkGeneratorSettings"), "set_chunk_generator_settings", "get_chunk_generator_settings");
 
 	ClassDB::bind_method(D_METHOD("get_material"), &ChunkLoader::get_material);
 	ClassDB::bind_method(D_METHOD("set_material", "material"), &ChunkLoader::set_material);
@@ -66,7 +64,13 @@ void ChunkLoader::_bind_methods()
 
 bool ChunkLoader::init()
 {
-	if (!chunk_generator.is_valid())
+	if (state != State::Stopped)
+	{
+		PRINT_ERROR("Chunk Loader is already initialised or is stopping.");
+		return false;
+	}
+
+	if (!chunk_generator_settings.is_valid())
 	{
 		PRINT_ERROR("chunk_generator not set!");
 		return false;
@@ -87,13 +91,40 @@ bool ChunkLoader::init()
 	if (!mesh_generator_pool.is_valid())
 	{
 		mesh_generator_pool.instantiate();
-		mesh_generator_pool->init(4); // 4 Threads
+	}
+	if (mesh_generator_pool->get_state() == MeshGeneratorPool::State::Stopped)
+	{
+		constexpr int64_t mesh_generator_thread_count = 2;
+		mesh_generator_pool->init(mesh_generator_thread_count);
+	}
+	else
+	{
+		PRINT_ERROR("mesh_generator_pool is stopping! It can't be initialised.");
+		return false;
+	}
+
+	if (!chunk_generator_pool.is_valid())
+	{
+		chunk_generator_pool.reference_ptr(memnew((ThreadPool<ChunkGenerator, ChunkData*, ChunkData*>)));
+	}
+
+	if (chunk_generator_pool->get_state() == ThreadPoolState::Stopped)
+	{
+		constexpr int64_t chunk_generator_thread_count = 8;
+		chunk_generator_pool->init(chunk_generator_thread_count, "", [settings = chunk_generator_settings]()
+				{ return ChunkGenerator::create(settings); });
+	}
+	else
+	{
+		PRINT_ERROR("chunk_generator_pool is stopping! It can't be initialised.");
+		return false;
 	}
 
 	if (!chunk_map)
 	{
 		chunk_map = std::make_shared<ConcurrentChunkMap>();
 		chunk_viewer->chunk_map = chunk_map;
+		chunk_map->pre_allocate_chunks_per_shard(4000); // This should be pre-allocated based on render distance
 	}
 
 	TerrainPerformanceMonitor* performance_monitor = TerrainPerformanceMonitor::get_singleton();
@@ -102,11 +133,20 @@ bool ChunkLoader::init()
 		performance_monitor->set_chunk_loader(this);
 	}
 
+	chunk_viewer->reset();
+
+	state = State::Ready;
 	return true;
 }
 
 void ChunkLoader::update()
 {
+	if (state != State::Ready)
+	{
+		PRINT_ERROR("Chunk Loader is not Ready");
+		return;
+	}
+
 	try_update_chunks();
 
 	uint64_t start_time = Time::get_singleton()->get_ticks_usec();
@@ -173,30 +213,31 @@ void ChunkLoader::update()
 
 void ChunkLoader::stop()
 {
+	if (state != State::Ready)
+	{
+		PRINT_ERROR("Trying to stop when Chunk Loader is stopped or already stopping.");
+		return;
+	}
+
+	state = State::Stopping;
+
 	mesh_generator_pool->stop(); // Blocks execution until all threads are stopped
+
+	chunk_generator_pool->stop();
+
+	state = State::Stopped;
 }
 
 void ChunkLoader::try_update_chunks()
 {
+	/*
 	if (mesh_generator_pool->get_task_count() > 256)
 	{
 		// Don't queue chunks if the mesh_generator has enough work
 		// We could still be generating chunks, but until there's chunk unloading and better memory management this is better than causing stutters.
 		return;
 	}
-
-	WorkerThreadPool* worker_thread_pool = WorkerThreadPool::get_singleton();
-	if (task_group_id != WorkerThreadPool::INVALID_TASK_ID)
-	{
-		if (worker_thread_pool->is_group_task_completed(task_group_id))
-		{
-			task_group_id = WorkerThreadPool::INVALID_TASK_ID;
-		}
-		else
-		{
-			return; // Not done, don't block main thread
-		}
-	}
+	*/
 
 	Callable update_func = callable_mp(this, &ChunkLoader::_update_chunks);
 	WorkerThreadPool::get_singleton()->add_task(update_func);
@@ -210,56 +251,38 @@ void ChunkLoader::_update_chunks()
 		return;
 	}
 
-	chunk_viewer->get_chunk_positions(pending_chunks, 128);
-	if (pending_chunks.size() > 0)
+	constexpr int64_t CHUNK_GEN_BATCH_SIZE = 128;
+	std::vector<Vector3i> chunk_positions = chunk_viewer->get_chunk_positions(CHUNK_GEN_BATCH_SIZE);
+	if (chunk_positions.size() > 0)
 	{
-		Callable worker_callable = callable_mp(this, &ChunkLoader::_process_group_chunk);
-		task_group_id = WorkerThreadPool::get_singleton()->add_group_task(
-				worker_callable,
-				pending_chunks.size(), // number_of_elements
-				-1, // elements_per_thread, -1 lets Godot decide the best distribution
-				false, // low priority to avoid starving the CPU
-				"ChunkGeneration");
-	}
-}
-
-void ChunkLoader::queue_chunk_update(Vector3i chunk_pos, bool prioritise)
-{
-	if (!mesh_generator_pool.is_valid())
-	{
-		PRINT_ERROR("not initialised");
-		return;
-	}
-
-	if (!chunk_generator.is_valid())
-	{
-		PRINT_ERROR("chunk_generator not set!");
-		return;
-	}
-
-	Callable callable = callable_mp(this, &ChunkLoader::_queue_generate_mesh_data);
-	WorkerThreadPool::get_singleton()->add_task(callable.bind(chunk_pos, prioritise), true);
-}
-
-void ChunkLoader::_queue_generate_mesh_data(Vector3i chunk_pos, bool prioritise)
-{
-	ChunkData chunk_data = chunk_generator->generate_points(chunk_pos);
-
-	bool mark_dirty = false; // Don't mark dirty it's being queued for meshing immediately.
-	chunk_map->update_chunk(chunk_data, mark_dirty);
-
-	if (chunk_data.surface_state == SurfaceState::MIXED)
-	{
-		chunk_datas_mutex.lock();
-		chunk_datas.push_back(chunk_data);
-		if (chunk_datas.size() > 16) // TODO: this helps reduce contention on the mesh generator pool's queue, but could cause issues esp. if there's not enough to trigger this!
+		std::vector<ChunkData*> chunks_to_generate;
+		chunks_to_generate.reserve(chunk_positions.size());
+		for (Vector3i chunk_pos : chunk_positions)
 		{
-			mesh_generator_pool->queue_generate_mesh_data(chunk_datas, prioritise);
-			chunk_datas.clear();
+			chunks_to_generate.push_back(chunk_map->get_or_create(chunk_pos));
 		}
-		chunk_datas_mutex.unlock();
+
+		chunk_generator_pool->queue_task(chunks_to_generate);
 	}
-	// If it's empty or full it should be fine to just forget about it and never queue it for meshing.
+
+	// TODO: Add a better way to queue these tasks. Pipe the chunk_generator_pool to the mesh_generator_pool
+	std::vector<ChunkData*> chunk_datas = chunk_generator_pool->take_results();
+	// Remove empty and full chunks as they don't need to be generated
+	std::erase_if(chunk_datas, [](ChunkData* chunk_data)
+			{ return chunk_data->surface_state != SurfaceState::MIXED; });
+	mesh_generator_pool->queue_generate_mesh_data(chunk_datas);
+}
+
+void ChunkLoader::unload_all()
+{
+	if (chunk_map)
+	{
+		chunk_map->unload_all();
+	}
+	if (chunk_viewer)
+	{
+		chunk_viewer->reset();
+	}
 }
 
 MeshInstance3D* ChunkLoader::get_chunk(Vector3i chunk_pos)
@@ -291,11 +314,4 @@ MeshInstance3D* ChunkLoader::get_chunk(Vector3i chunk_pos)
 	chunk_node_map[chunk_pos] = mesh_instance;
 
 	return mesh_instance;
-}
-
-void ChunkLoader::_process_group_chunk(uint32_t p_index)
-{
-	Vector3i coord = pending_chunks[p_index];
-	bool prioritise = false; // TODO: Set the priority for close and edited chunks
-	_queue_generate_mesh_data(coord, prioritise);
 }

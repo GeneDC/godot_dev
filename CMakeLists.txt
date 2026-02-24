@@ -74,6 +74,7 @@ set_target_properties(godot-cpp PROPERTIES
 	RUNTIME_OUTPUT_DIRECTORY_RELEASE "${GD_CPP_DIR}/bin"
 )
 
+# Start adding extensions
 file(GLOB extension_dirs RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "extensions/*")
 
 set(ALL_EXTENSION_TARGETS "") # Initialize list of extension targets
@@ -119,8 +120,8 @@ foreach(dir ${extension_dirs})
 			endif()
 
 			# Organize the IDE View
-			# Put the project in the "Extensions" folder
-			set_target_properties(${ext_name} PROPERTIES FOLDER "Extensions")
+			# Put the project in the "extensions" folder
+			set_target_properties(${ext_name} PROPERTIES FOLDER "extensions")
 			# Tell VS to mirror the actual folder structure on disk
 			source_group(TREE "${current_ext_path}" FILES ${SOURCES})
 
@@ -249,7 +250,8 @@ function(add_godot_project_launch_targets TARGET_NAME)
 	add_godot_project("${TARGET_NAME}_game" "")
 endfunction()
 
-add_godot_project_launch_targets("project")
+set(ProjectName "project")
+add_godot_project_launch_targets("${ProjectName}")
 
 # Set as DEFAULT startup project
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT "${ProjectName}_editor")

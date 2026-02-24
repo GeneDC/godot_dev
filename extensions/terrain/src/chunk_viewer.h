@@ -19,7 +19,9 @@ class ChunkViewer : public Node3D
 public:
 	std::shared_ptr<ConcurrentChunkMap> chunk_map;
 
-	void get_chunk_positions(std::vector<Vector3i>& target, uint64_t count);
+	std::vector<Vector3i> get_chunk_positions(int64_t count);
+
+	void reset();
 
 	Vector3i get_current_chunk_pos() const;
 
@@ -30,6 +32,7 @@ protected:
 
 private:
 	void update_view();
+	void reset_unblocking();
 
 	int current_shell = 0;
 	int current_index = 0;

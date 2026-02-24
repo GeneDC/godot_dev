@@ -7,15 +7,15 @@
 
 [sub_resource type="BoxMesh" id="BoxMesh_2jas5"]
 
-[sub_resource type="FastNoiseLite" id="FastNoiseLite_n51mc"]
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_wcwec"]
 
 [sub_resource type="FastNoiseLite" id="FastNoiseLite_ei00m"]
 noise_type = 5
 frequency = 0.001
 fractal_type = 3
 
-[sub_resource type="ChunkGenerator" id="ChunkGenerator_ugfer"]
-height_base_noise = SubResource("FastNoiseLite_n51mc")
+[sub_resource type="ChunkGeneratorSettings" id="ChunkGeneratorSettings_wcwec"]
+height_base_noise = SubResource("FastNoiseLite_wcwec")
 base_height_multiplier = 10.0
 height_multiplier_noise = SubResource("FastNoiseLite_ei00m")
 
@@ -34,7 +34,7 @@ script = ExtResource("2_n51mc")
 
 [node name="ChunkLoader" type="ChunkLoader" parent="." node_paths=PackedStringArray("chunk_viewer")]
 chunk_viewer = NodePath("../Camera3D/ChunkViewer")
-chunk_generator = SubResource("ChunkGenerator_ugfer")
+chunk_generator_settings = SubResource("ChunkGeneratorSettings_wcwec")
 material = ExtResource("3_8lvy3")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]

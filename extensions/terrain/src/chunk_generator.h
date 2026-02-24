@@ -1,28 +1,24 @@
 #pragma once
 
-#include "godot_cpp/classes/resource.hpp"
+#include "abstract_task_processer.h"
+#include "chunk_data.h"
 #include "terrain_constants.h"
 
 #include <godot_cpp/classes/fast_noise_lite.hpp>
 #include <godot_cpp/classes/ref.hpp>
+#include <godot_cpp/classes/ref_counted.hpp>
+#include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/wrapped.hpp>
-#include <godot_cpp/variant/packed_float32_array.hpp>
+#include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/variant/vector3.hpp>
-#include <godot_cpp/variant/vector3i.hpp>
-
-#include <chunk_data.h>
 
 using namespace godot;
 
-class ChunkGenerator : public Resource
+class ChunkGeneratorSettings : public Resource
 {
-	GDCLASS(ChunkGenerator, Resource)
+	GDCLASS(ChunkGeneratorSettings, Resource)
 
 public:
-	ChunkGenerator() = default;
-
-	ChunkData generate_points(Vector3i chunk_pos) const;
-
 	// Modifies where the terrain height should start int base_height_offset;
 	float base_height_offset = 0.0f;
 	// Base height. Creates the initial variations in terrain
@@ -46,16 +42,39 @@ protected:
 
 	Ref<FastNoiseLite> get_height_multiplier_noise() const { return height_multiplier_noise; }
 	void set_height_multiplier_noise(Ref<FastNoiseLite> p_height_multiplier_noise) { height_multiplier_noise = p_height_multiplier_noise; }
+};
+
+class ChunkGenerator final : public ITaskProcessor<ChunkData*, ChunkData*>
+{
+	GDCLASS(ChunkGenerator, RefCounted)
+
+public:
+	ChunkGenerator() = default;
+	virtual ~ChunkGenerator() = default;
+
+	static Ref<ChunkGenerator> create(Ref<ChunkGeneratorSettings> p_settings)
+	{
+		Ref<ChunkGenerator> chunk_generator = memnew((ChunkGenerator));
+		chunk_generator->settings = p_settings->duplicate(true);
+
+		for (int i = 0; i < 256; ++i)
+		{
+			uint8_to_float[i] = (static_cast<float>(i) * 0.007843137f) - 1.0f;
+		}
+
+		return chunk_generator;
+	}
+
+	virtual ChunkData* process_task(ChunkData* chunk_data) override;
+
+protected:
+	static void _bind_methods() {}
 
 private:
-	bool generate_height_map(const Vector3& p_chunk_world_pos) const;
-
-	PackedFloat32Array get_empty_points() const;
-	PackedFloat32Array get_full_points() const;
-
-	// points scratch pad to save memory allocation when generating empty chunks
-	static thread_local float tl_points[terrain_constants::POINTS_VOLUME];
-
 	// scratch pad for height map
 	static thread_local float tl_height_map[terrain_constants::POINTS_AREA];
+	static thread_local float uint8_to_float[256];
+	bool generate_height_map(const Vector3& p_chunk_world_pos) const;
+
+	Ref<ChunkGeneratorSettings> settings;
 };

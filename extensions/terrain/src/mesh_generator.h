@@ -33,7 +33,7 @@ public:
 	// Call once to setup. Creates local rendering device, loads shader, and setups the buffers and uniforms
 	bool init();
 	// Returns MeshData for a ArrayMesh using the compute shader results.
-	[[nodiscard]] MeshData generate_mesh_data(ChunkData chunk_data);
+	[[nodiscard]] MeshData generate_mesh_data(ChunkData* chunk_data);
 
 protected:
 	static void _bind_methods() {};

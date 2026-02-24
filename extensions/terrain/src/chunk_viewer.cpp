@@ -10,34 +10,45 @@
 
 using namespace godot;
 
-void ChunkViewer::get_chunk_positions(std::vector<Vector3i>& target, uint64_t count)
+std::vector<Vector3i> ChunkViewer::get_chunk_positions(int64_t max_count)
 {
 	std::shared_lock lock(mutex); // Read lock
 
-	target.clear();
-
 	ShellRange range = CHUNK_SHELL_RANGES[current_shell];
 
-	while (target.size() < count)
+	std::vector<Vector3i> results{};
+	results.reserve(max_count);
+
+	int64_t count = 0;
+	while (results.size() < max_count)
 	{
-		if (range.start + current_index == range.end)
+		if (range.start + count >= range.end)
 		{
-			if (current_shell == CHUNK_SHELL_RANGE_COUNT - 1)
+			if (current_shell >= CHUNK_SHELL_RANGE_COUNT - 1)
 			{
 				break; // No more shells to process
 			}
 
 			current_shell++;
-			current_index = 0;
+			count = 0;
 			range = CHUNK_SHELL_RANGES[current_shell];
 		}
-		Vector3i position = last_chunk_pos + CHUNK_LUT[range.start + current_index];
+		Vector3i position = last_chunk_pos + CHUNK_LUT[range.start + count];
 		if (!chunk_map->has_chunk(position))
 		{
-			target.push_back(position);
+			results.push_back(position);
 		}
-		current_index++;
+		count++;
 	}
+
+	return results; // Target index should equal the count
+}
+
+void ChunkViewer::reset()
+{
+	mutex.lock();
+	reset_unblocking();
+	mutex.unlock();
 }
 
 Vector3i ChunkViewer::get_current_chunk_pos() const
@@ -60,9 +71,14 @@ void ChunkViewer::update_view()
 	}
 	if (mutex.try_lock())
 	{
-		current_shell = 0;
-		current_index = 0;
-		last_chunk_pos = current_pos;
+		reset_unblocking();
 		mutex.unlock();
 	}
+}
+
+void ChunkViewer::reset_unblocking()
+{
+	current_shell = 0;
+	current_index = 0;
+	last_chunk_pos = get_current_chunk_pos();
 }

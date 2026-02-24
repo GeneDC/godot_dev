@@ -14,6 +14,7 @@
 #include <godot_cpp/variant/callable_method_pointer.hpp>
 
 constexpr const char* CHUNKS_ID = "Terrain/LoadedChunkCount";
+constexpr const char* CHUNKS_POOLED_ID = "Terrain/PooledChunkCount";
 constexpr const char* CHUNKS_PS_ID = "Terrain/LoadedChunkCountPerSec";
 constexpr const char* MESH_TASKS_PS_ID = "Terrain/MeshTasksPerSec";
 constexpr const char* PENDING_CHUNKS_ID = "Terrain/PendingChunks";
@@ -29,6 +30,7 @@ void TerrainPerformanceMonitor::initialize()
 	if (!performance) return;
 
 	performance->add_custom_monitor(CHUNKS_ID, callable_mp(this, &TerrainPerformanceMonitor::get_chunks));
+	performance->add_custom_monitor(CHUNKS_POOLED_ID, callable_mp(this, &TerrainPerformanceMonitor::get_pooled_chunks));
 	performance->add_custom_monitor(CHUNKS_PS_ID, callable_mp(this, &TerrainPerformanceMonitor::get_chunks_ps));
 	performance->add_custom_monitor(MESH_TASKS_PS_ID, callable_mp(this, &TerrainPerformanceMonitor::get_mesh_tasks_ps));
 	performance->add_custom_monitor(PENDING_CHUNKS_ID, callable_mp(this, &TerrainPerformanceMonitor::get_pending_chunks_count));
@@ -41,6 +43,7 @@ void TerrainPerformanceMonitor::uninitialize()
 	if (!performance) return;
 
 	performance->remove_custom_monitor(CHUNKS_ID);
+	performance->remove_custom_monitor(CHUNKS_POOLED_ID);
 	performance->remove_custom_monitor(CHUNKS_PS_ID);
 	performance->remove_custom_monitor(MESH_TASKS_PS_ID);
 	performance->remove_custom_monitor(PENDING_CHUNKS_ID);
@@ -59,7 +62,7 @@ void TerrainPerformanceMonitor::set_chunk_loader(ChunkLoader* p_chunk_loader)
 	}
 }
 
-uint64_t TerrainPerformanceMonitor::get_chunks()
+int64_t TerrainPerformanceMonitor::get_chunks()
 {
 	if (chunk_map.expired())
 	{
@@ -69,10 +72,25 @@ uint64_t TerrainPerformanceMonitor::get_chunks()
 	return chunk_map.lock()->get_loaded_count();
 }
 
+int64_t TerrainPerformanceMonitor::get_pooled_chunks()
+{
+	if (chunk_map.expired())
+	{
+		return 0;
+	}
+
+	return chunk_map.lock()->get_pool_count();
+}
+
 float TerrainPerformanceMonitor::get_chunks_ps()
 {
 	uint64_t time = Time::get_singleton()->get_ticks_usec();
 	float chunk_count = get_chunks();
+
+	if (last_loaded_chunk_count > chunk_count)
+	{
+		last_loaded_chunk_count = chunk_count;
+	}
 
 	if (last_chunk_time == 0)
 	{
@@ -90,7 +108,7 @@ float TerrainPerformanceMonitor::get_chunks_ps()
 	uint64_t chunk_count_change = chunk_count - last_loaded_chunk_count;
 	float new_chunk_count_ps = chunk_count_change / delta_time;
 
-	constexpr float alpha = 0.2f;
+	constexpr float alpha = 0.5f;
 	chunk_count_ps = (new_chunk_count_ps * alpha) + (chunk_count_ps * (1.0f - alpha));
 
 	last_loaded_chunk_count = chunk_count;
@@ -101,27 +119,32 @@ float TerrainPerformanceMonitor::get_chunks_ps()
 
 float TerrainPerformanceMonitor::get_mesh_tasks_ps()
 {
-	uint64_t current_tasks = mesh_generator_pool->get_task_count();
-	uint64_t max_capacity = 256; // mesh_generator_pool->get_max_capacity();
+	if (!mesh_generator_pool)
+	{
+		return 0.0f;
+	}
+
+	int64_t current_tasks = mesh_generator_pool->get_task_count();
+	int64_t max_capacity = 256; // mesh_generator_pool->get_max_capacity();
 
 	if (max_capacity == 0) return 0.0f;
 
 	float current_saturation = static_cast<float>(current_tasks) / max_capacity;
 
-	constexpr float alpha = 0.2f;
+	constexpr float alpha = 0.5f;
 	mesh_saturation = (current_saturation * alpha) + (mesh_saturation * (1.0f - alpha));
 
 	return mesh_saturation;
 }
 
-uint64_t TerrainPerformanceMonitor::get_pending_chunks_count()
+int64_t TerrainPerformanceMonitor::get_pending_chunks_count()
 {
-	return chunk_loader->get_pending_chunks_count();
+	return chunk_loader ? chunk_loader->get_pending_chunks_count() : 0;
 }
 
-uint64_t TerrainPerformanceMonitor::get_done_mesh_data_count()
+int64_t TerrainPerformanceMonitor::get_done_mesh_data_count()
 {
-	return chunk_loader->get_mesh_datas_count();
+	return chunk_loader ? chunk_loader->get_mesh_datas_count() : 0;
 }
 
 void TerrainPerformanceMonitor::_bind_methods()

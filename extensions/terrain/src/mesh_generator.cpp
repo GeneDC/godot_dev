@@ -22,6 +22,7 @@
 #include <utility>
 #include <godot_cpp/variant/packed_vector4_array.hpp>
 #include "chunk_data.h"
+#include <span>
 
 using namespace godot;
 using namespace terrain_constants;
@@ -147,14 +148,14 @@ bool MeshGenerator::init()
 	return true;
 }
 
-MeshData MeshGenerator::generate_mesh_data(ChunkData chunk_data)
+MeshData MeshGenerator::generate_mesh_data(ChunkData* chunk_data)
 {
 	MeshData mesh_data{};
-	mesh_data.chunk_pos = chunk_data.position;
+	mesh_data.chunk_pos = chunk_data->position;
 
 	// No mesh to generate if the chunk is entirely empty or full
 	// TODO: Rework this check when we need to generate with the surrounding chunks
-	if (chunk_data.surface_state != SurfaceState::MIXED)
+	if (chunk_data->surface_state != SurfaceState::MIXED)
 	{
 		PRINT_WARNING("Skipping chunk that will have no mesh data. This should be skipped before it gets to the mesh generator.");
 		return mesh_data;
@@ -180,14 +181,19 @@ MeshData MeshGenerator::generate_mesh_data(ChunkData chunk_data)
 
 	if (!local_rendering_device)
 	{
-		PRINT_ERROR("Not initalised");
+		PRINT_ERROR("Not initialised");
 		return mesh_data;
 	}
 
-	PackedByteArray points_byte_array = chunk_data.points.to_byte_array();
+	PackedByteArray points_byte_array;
+	uint64_t points_byte_count = POINTS_VOLUME * sizeof(float);
+	points_byte_array.resize(points_byte_count);
+
+	std::span<float> data_span(chunk_data->points, POINTS_VOLUME);
+	std::memcpy(points_byte_array.ptrw(), data_span.data(), points_byte_count);
 
 	// update the points buffer
-	local_rendering_device->buffer_update(points_buffer, 0, points_byte_array.size(), points_byte_array);
+	local_rendering_device->buffer_update(points_buffer, 0, points_byte_count, points_byte_array);
 
 	// clear the previous buffers
 	local_rendering_device->buffer_clear(vertex_buffer, 0, vertex_buffer_byte_count);
@@ -202,7 +208,7 @@ MeshData MeshGenerator::generate_mesh_data(ChunkData chunk_data)
 	local_rendering_device->compute_list_bind_compute_pipeline(compute_list_id, pipeline);
 	// bind our buffer uniform to our pipeline
 	local_rendering_device->compute_list_bind_uniform_set(compute_list_id, uniform_set, 0);
-	// specify how many workgroups to use
+	// specify how many work groups to use
 	constexpr uint32_t group_size = CHUNK_SIZE / 8;
 	local_rendering_device->compute_list_dispatch(compute_list_id, group_size, group_size, group_size);
 	// end the list of instructions

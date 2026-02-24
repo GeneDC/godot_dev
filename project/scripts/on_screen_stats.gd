@@ -9,6 +9,7 @@ func _ready():
 	add_perf_monitor("Static Mem", func(): return "%.2f MB" % (Performance.get_monitor(Performance.MEMORY_STATIC) / 1024 / 1024))
 	add_perf_monitor("Draw Calls", func(): return "%.0f" % Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
 	add_perf_monitor("Chunks", func(): return Performance.get_custom_monitor("Terrain/LoadedChunkCount"))
+	add_perf_monitor("Chunks (Pooled)", func(): return Performance.get_custom_monitor("Terrain/PooledChunkCount"))
 	add_perf_monitor("CPS", func(): return "%.1f/s" % Performance.get_custom_monitor("Terrain/LoadedChunkCountPerSec"))
 	add_perf_monitor("Mesh Tasks", func(): return "%.2f%%" % (100 * Performance.get_custom_monitor("Terrain/MeshTasksPerSec")))
 	add_perf_monitor("Pending Chunks", func(): return Performance.get_custom_monitor("Terrain/PendingChunks"))
