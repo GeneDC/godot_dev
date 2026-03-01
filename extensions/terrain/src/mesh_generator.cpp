@@ -189,7 +189,7 @@ MeshData MeshGenerator::generate_mesh_data(ChunkData* chunk_data)
 	uint64_t points_byte_count = POINTS_VOLUME * sizeof(float);
 	points_byte_array.resize(points_byte_count);
 
-	std::span<float> data_span(chunk_data->points, POINTS_VOLUME);
+	std::span<float> data_span(chunk_data->points.begin(), POINTS_VOLUME);
 	std::memcpy(points_byte_array.ptrw(), data_span.data(), points_byte_count);
 
 	// update the points buffer

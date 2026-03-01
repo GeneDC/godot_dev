@@ -124,7 +124,7 @@ bool ChunkLoader::init()
 	{
 		chunk_map = std::make_shared<ConcurrentChunkMap>();
 		chunk_viewer->chunk_map = chunk_map;
-		chunk_map->pre_allocate_chunks_per_shard(4000); // This should be pre-allocated based on render distance
+		chunk_map->pre_allocate_chunks_per_shard(1024); // This should be pre-allocated based on render distance
 	}
 
 	TerrainPerformanceMonitor* performance_monitor = TerrainPerformanceMonitor::get_singleton();
