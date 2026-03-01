@@ -94,7 +94,7 @@ bool ChunkLoader::init()
 	}
 	if (mesh_generator_pool->get_state() == MeshGeneratorPool::State::Stopped)
 	{
-		constexpr int64_t mesh_generator_thread_count = 2;
+		constexpr int64_t mesh_generator_thread_count = 1;
 		mesh_generator_pool->init(mesh_generator_thread_count);
 	}
 	else
@@ -230,14 +230,17 @@ void ChunkLoader::stop()
 
 void ChunkLoader::try_update_chunks()
 {
-	/*
 	if (mesh_generator_pool->get_task_count() > 256)
 	{
 		// Don't queue chunks if the mesh_generator has enough work
 		// We could still be generating chunks, but until there's chunk unloading and better memory management this is better than causing stutters.
 		return;
 	}
-	*/
+
+	if (chunk_generator_pool->get_task_count() > 1024)
+	{
+		return;
+	}
 
 	Callable update_func = callable_mp(this, &ChunkLoader::_update_chunks);
 	WorkerThreadPool::get_singleton()->add_task(update_func);

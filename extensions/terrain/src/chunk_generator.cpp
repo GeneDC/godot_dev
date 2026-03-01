@@ -52,6 +52,7 @@ ChunkData* ChunkGenerator::process_task(ChunkData* chunk_data)
 		return chunk_data;
 	}
 	const float* height_map_ptr = tl_height_map;
+	uint8_t* points_ptr = chunk_data->points.data();
 
 	float count = 0.0f;
 	for (int z = 0; z < POINTS_SIZE; z++)
@@ -72,7 +73,7 @@ ChunkData* ChunkGenerator::process_task(ChunkData* chunk_data)
 				//value = CLAMP(value - density, 0.0f, 1.0f);
 
 				count += value;
-				chunk_data->points[x + y * POINTS_SIZE + z * POINTS_AREA] = value;
+				points_ptr[x + y * POINTS_SIZE + z * POINTS_AREA] = static_cast<uint8_t>(value * 255.0f + 0.5f);
 			}
 		}
 	}

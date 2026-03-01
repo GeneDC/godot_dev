@@ -2,13 +2,17 @@
 
 #include "chunk_data.h"
 
+#include <godot_cpp/classes/rd_sampler_state.hpp>
 #include <godot_cpp/classes/rd_shader_file.hpp>
 #include <godot_cpp/classes/rd_shader_spirv.hpp>
+#include <godot_cpp/classes/rd_texture_format.hpp>
+#include <godot_cpp/classes/rd_texture_view.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/classes/rendering_device.hpp>
 #include <godot_cpp/classes/wrapped.hpp>
 #include <godot_cpp/variant/array.hpp>
+#include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
 
 #include <cstdint>
@@ -51,6 +55,10 @@ private:
 
 	// Shader Input buffers
 	RID points_buffer;
+	Ref<RDTextureFormat> points_texture_format;
+	Ref<RDTextureView> points_texture_view;
+	Ref<RDSamplerState> points_sampler_state;
+	RID points_sampler_rid;
 
 	// Shader Output buffers
 	int vertex_buffer_byte_count = -1;

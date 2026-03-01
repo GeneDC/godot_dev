@@ -7,10 +7,7 @@
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
 
 // A binding to the buffer we create in our script
-layout(set = 0, binding = 0, std430) restrict readonly buffer PointsBuffer {
-	float points[];
-}
-points_buffer;
+layout(set = 0, binding = 0) uniform sampler3D points_tex;
 
 layout(set = 0, binding = 1, std430) restrict writeonly buffer VertexBuffer {
 	float verts[];
@@ -97,31 +94,25 @@ void AddTri(vec4 vert_a, vec4 vert_b, vec4 vert_c)
 
 shared float points_cache[9 * 9 * 9];
 
-int get_cache_idx(uvec3 p) {
+int get_cache_idx(ivec3 p) {
 	return int(p.x + (p.y * 9u) + (p.z * 81u));
 }
 
-float Point(uint x, uint y, uint z)
+float Point(int x, int y, int z)
 {
-	uint index = get_cache_idx(uvec3(x, y, z));
+	uint index = get_cache_idx(ivec3(x, y, z));
 	return points_cache[index];
 }
 
-uint get_density_index(uvec3 pos)
+float get_density(ivec3 pos)
 {
-	return pos.x + pos.y * numPointsPerAxis + pos.z * numPointsPerAxis * numPointsPerAxis;
-}
-
-float get_density(uvec3 pos)
-{
-	uint index = get_density_index(pos);
-	return points_buffer.points[index];
+	return texelFetch(points_tex, pos, 0).r;
 }
 
 void main()
 {
-	uvec3 local_id = gl_LocalInvocationID;
-	uvec3 global_id = gl_GlobalInvocationID;
+	ivec3 local_id = ivec3(gl_LocalInvocationID);
+	ivec3 global_id = ivec3(gl_GlobalInvocationID);
 	if (global_id.x >= numCubesPerAxis || global_id.y >= numCubesPerAxis || global_id.z >= numCubesPerAxis) return;
 
 	points_cache[get_cache_idx(local_id)] = get_density(global_id);
@@ -130,29 +121,28 @@ void main()
 	bool edge_y = (local_id.y == 7u);
 	bool edge_z = (local_id.z == 7u);
 
-	if (edge_x) points_cache[get_cache_idx(local_id + uvec3(1,0,0))] = get_density(global_id + uvec3(1,0,0));
-	if (edge_y) points_cache[get_cache_idx(local_id + uvec3(0,1,0))] = get_density(global_id + uvec3(0,1,0));
-	if (edge_z) points_cache[get_cache_idx(local_id + uvec3(0,0,1))] = get_density(global_id + uvec3(0,0,1));
-	if (edge_x && edge_y) points_cache[get_cache_idx(local_id + uvec3(1,1,0))] = get_density(global_id + uvec3(1,1,0));
-	if (edge_y && edge_z) points_cache[get_cache_idx(local_id + uvec3(0,1,1))] = get_density(global_id + uvec3(0,1,1));
-	if (edge_x && edge_z) points_cache[get_cache_idx(local_id + uvec3(1,0,1))] = get_density(global_id + uvec3(1,0,1));
-	if (edge_x && edge_y && edge_z) points_cache[get_cache_idx(uvec3(8,8,8))] = get_density(global_id + uvec3(1,1,1));
+	if (edge_x) points_cache[get_cache_idx(local_id + ivec3(1,0,0))] = get_density(global_id + ivec3(1,0,0));
+	if (edge_y) points_cache[get_cache_idx(local_id + ivec3(0,1,0))] = get_density(global_id + ivec3(0,1,0));
+	if (edge_z) points_cache[get_cache_idx(local_id + ivec3(0,0,1))] = get_density(global_id + ivec3(0,0,1));
+	if (edge_x && edge_y) points_cache[get_cache_idx(local_id + ivec3(1,1,0))] = get_density(global_id + ivec3(1,1,0));
+	if (edge_y && edge_z) points_cache[get_cache_idx(local_id + ivec3(0,1,1))] = get_density(global_id + ivec3(0,1,1));
+	if (edge_x && edge_z) points_cache[get_cache_idx(local_id + ivec3(1,0,1))] = get_density(global_id + ivec3(1,0,1));
+	if (edge_x && edge_y && edge_z) points_cache[get_cache_idx(ivec3(8,8,8))] = get_density(global_id + ivec3(1,1,1));
 
-	// Wait for all 512 threads to finish the loading dance
+	// Wait for all 512 threads to finish the loading
 	memoryBarrierShared();
 	barrier();
 
-	uvec3 id = local_id;
 	vec4 cubeCorners[8] = 
 	{
-		vec4(0, 0, 0, Point(id.x,		id.y,		id.z	)),
-		vec4(1, 0, 0, Point(id.x + 1,	id.y,		id.z	)),
-		vec4(1, 0, 1, Point(id.x + 1,	id.y,		id.z + 1)),
-		vec4(0, 0, 1, Point(id.x,		id.y,		id.z + 1)),
-		vec4(0, 1, 0, Point(id.x,		id.y + 1,	id.z	)),
-		vec4(1, 1, 0, Point(id.x + 1,	id.y + 1,	id.z	)),
-		vec4(1, 1, 1, Point(id.x + 1,	id.y + 1,	id.z + 1)),
-		vec4(0, 1, 1, Point(id.x,		id.y + 1,	id.z + 1)),
+		vec4(0, 0, 0, Point(local_id.x,		local_id.y,		local_id.z)),
+		vec4(1, 0, 0, Point(local_id.x + 1,	local_id.y,		local_id.z)),
+		vec4(1, 0, 1, Point(local_id.x + 1,	local_id.y,		local_id.z + 1)),
+		vec4(0, 0, 1, Point(local_id.x,		local_id.y,		local_id.z + 1)),
+		vec4(0, 1, 0, Point(local_id.x,		local_id.y + 1,	local_id.z)),
+		vec4(1, 1, 0, Point(local_id.x + 1,	local_id.y + 1,	local_id.z)),
+		vec4(1, 1, 1, Point(local_id.x + 1,	local_id.y + 1,	local_id.z + 1)),
+		vec4(0, 1, 1, Point(local_id.x,		local_id.y + 1,	local_id.z + 1)),
 	};
 
 	uint cubeIndex = 0;

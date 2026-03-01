@@ -1,10 +1,12 @@
 #include "mesh_generator.h"
 
+#include "chunk_data.h"
 #include "godot_utility.h"
 #include "terrain_constants.h"
 
 #include <godot_cpp/classes/mesh.hpp>
 #include <godot_cpp/classes/os.hpp>
+#include <godot_cpp/classes/rd_texture_view.hpp>
 #include <godot_cpp/classes/rd_uniform.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/rendering_device.hpp>
@@ -12,17 +14,12 @@
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
-#include <godot_cpp/variant/packed_float32_array.hpp>
-#include <godot_cpp/variant/packed_vector3_array.hpp>
+#include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
 
 #include <cstdint>
 #include <cstring>
-#include <utility>
-#include <godot_cpp/variant/packed_vector4_array.hpp>
-#include "chunk_data.h"
-#include <span>
 
 using namespace godot;
 using namespace terrain_constants;
@@ -33,6 +30,7 @@ MeshGenerator::~MeshGenerator()
 	{
 		if (shader.is_valid()) local_rendering_device->free_rid(shader);
 		if (points_buffer.is_valid()) local_rendering_device->free_rid(points_buffer);
+		if (points_sampler_rid.is_valid()) local_rendering_device->free_rid(points_sampler_rid);
 		if (vertex_buffer.is_valid()) local_rendering_device->free_rid(vertex_buffer);
 		if (normal_buffer.is_valid()) local_rendering_device->free_rid(normal_buffer);
 		if (colour_buffer.is_valid()) local_rendering_device->free_rid(colour_buffer);
@@ -89,13 +87,28 @@ bool MeshGenerator::init()
 
 	TypedArray<RDUniform> uniforms{};
 
-	// create a storage buffer that can hold our points.
-	points_buffer = local_rendering_device->storage_buffer_create(POINTS_VOLUME * sizeof(float));
+	points_texture_format.instantiate();
+	points_texture_format->set_format(RenderingDevice::DATA_FORMAT_R8_UNORM);
+	points_texture_format->set_width(POINTS_SIZE);
+	points_texture_format->set_height(POINTS_SIZE);
+	points_texture_format->set_depth(POINTS_SIZE);
+	points_texture_format->set_texture_type(RenderingDevice::TEXTURE_TYPE_3D);
+	points_texture_format->set_usage_bits(RenderingDevice::TEXTURE_USAGE_CAN_UPDATE_BIT | RenderingDevice::TEXTURE_USAGE_SAMPLING_BIT);
+
+	points_texture_view.instantiate();
+
+	points_buffer = local_rendering_device->texture_create(points_texture_format, points_texture_view);
+
+	points_sampler_state.instantiate();
+	points_sampler_state->set_mag_filter(RenderingDevice::SAMPLER_FILTER_NEAREST);
+	points_sampler_state->set_min_filter(RenderingDevice::SAMPLER_FILTER_NEAREST);
+	points_sampler_rid = local_rendering_device->sampler_create(points_sampler_state);
 
 	Ref<RDUniform> uniform_points{};
 	uniform_points.instantiate();
-	uniform_points->set_uniform_type(RenderingDevice::UNIFORM_TYPE_STORAGE_BUFFER);
+	uniform_points->set_uniform_type(RenderingDevice::UNIFORM_TYPE_SAMPLER_WITH_TEXTURE);
 	uniform_points->set_binding(0); // Match layout(binding = 0) in the shader
+	uniform_points->add_id(points_sampler_rid);
 	uniform_points->add_id(points_buffer);
 	uniforms.push_back(uniform_points);
 
@@ -186,14 +199,11 @@ MeshData MeshGenerator::generate_mesh_data(ChunkData* chunk_data)
 	}
 
 	PackedByteArray points_byte_array;
-	uint64_t points_byte_count = POINTS_VOLUME * sizeof(float);
-	points_byte_array.resize(points_byte_count);
-
-	std::span<float> data_span(chunk_data->points.begin(), POINTS_VOLUME);
-	std::memcpy(points_byte_array.ptrw(), data_span.data(), points_byte_count);
+	points_byte_array.resize(POINTS_VOLUME);
+	std::memcpy(points_byte_array.ptrw(), chunk_data->points.data(), terrain_constants::POINTS_VOLUME);
 
 	// update the points buffer
-	local_rendering_device->buffer_update(points_buffer, 0, points_byte_count, points_byte_array);
+	local_rendering_device->texture_update(points_buffer, 0, points_byte_array);
 
 	// clear the previous buffers
 	local_rendering_device->buffer_clear(vertex_buffer, 0, vertex_buffer_byte_count);
