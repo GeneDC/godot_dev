@@ -230,14 +230,14 @@ void ChunkLoader::stop()
 
 void ChunkLoader::try_update_chunks()
 {
-	if (mesh_generator_pool->get_task_count() > 256)
+	if (mesh_generator_pool->get_task_count() > 1024)
 	{
 		// Don't queue chunks if the mesh_generator has enough work
 		// We could still be generating chunks, but until there's chunk unloading and better memory management this is better than causing stutters.
 		return;
 	}
 
-	if (chunk_generator_pool->get_task_count() > 1024)
+	if (chunk_generator_pool->get_task_count() > 2048)
 	{
 		return;
 	}

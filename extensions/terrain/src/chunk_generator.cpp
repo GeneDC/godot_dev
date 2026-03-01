@@ -9,14 +9,19 @@
 #include <godot_cpp/classes/noise.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/core/object.hpp>
 #include <godot_cpp/core/print_string.hpp>
 #include <godot_cpp/core/property_info.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/variant.hpp>
 #include <godot_cpp/variant/vector2.hpp>
+#include <godot_cpp/variant/vector2i.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
+
 #include <cstdint>
+#include <iterator>
+#include <list>
 
 using namespace godot;
 using namespace terrain_constants;
@@ -51,7 +56,7 @@ ChunkData* ChunkGenerator::process_task(ChunkData* chunk_data)
 		chunk_data->surface_state = SurfaceState::EMPTY;
 		return chunk_data;
 	}
-	const float* height_map_ptr = tl_height_map;
+	const float* height_map_ptr = tl_height_map->data.data();
 	uint8_t* points_ptr = chunk_data->points.data();
 
 	float count = 0.0f;
@@ -91,50 +96,86 @@ ChunkData* ChunkGenerator::process_task(ChunkData* chunk_data)
 		chunk_data->surface_state = SurfaceState::MIXED;
 	}
 
-
 	return chunk_data;
 }
 
-thread_local float ChunkGenerator::tl_height_map[POINTS_AREA];
 thread_local float ChunkGenerator::uint8_to_float[256];
+thread_local ChunkGenerator::HeightMap* ChunkGenerator::tl_height_map = nullptr;
+thread_local std::list<ChunkGenerator::HeightMap> ChunkGenerator::tl_height_map_cache;
 
 bool ChunkGenerator::generate_height_map(const Vector3& p_chunk_world_pos) const
 {
 	if (!settings->height_base_noise.is_valid())
 	{
 		print_error("height_base_noise is invalid");
+		return false;
 	}
 
 	if (!settings->height_multiplier_noise.is_valid())
 	{
 		print_error("height_multiplier_noise is invalid");
+		return false;
 	}
 
-	settings->height_base_noise->set_offset(Vector3(p_chunk_world_pos.x, p_chunk_world_pos.z, 0));
-	settings->height_multiplier_noise->set_offset(Vector3(p_chunk_world_pos.x, p_chunk_world_pos.z, 0));
+	Vector2i target_xz = Vector2i(p_chunk_world_pos.x, p_chunk_world_pos.z);
+	HeightMap* active_height_map = nullptr;
 
-	Ref<Image> img_base = settings->height_base_noise->get_image(POINTS_SIZE, POINTS_SIZE, false, false, false);
-	Ref<Image> img_mult = settings->height_multiplier_noise->get_image(POINTS_SIZE, POINTS_SIZE, false, false, false);
+	// Try get an already generated height map for this position
+	for (auto it = tl_height_map_cache.begin(); it != tl_height_map_cache.end(); ++it)
+	{
+		if (it->position == target_xz)
+		{
+			tl_height_map_cache.splice(tl_height_map_cache.begin(), tl_height_map_cache, it);
+			active_height_map = &(*tl_height_map_cache.begin());
+			break;
+		}
+	}
 
-	const uint8_t* base_ptr = img_base->get_data().ptr();
-	const uint8_t* mult_ptr = img_mult->get_data().ptr();
+	if (active_height_map)
+	{
+		tl_height_map = active_height_map;
+		return true;
+	}
 
-	float* out_ptr = tl_height_map;
+	// Reuse least recently used height map
+	if (tl_height_map_cache.size() >= HEIGHT_MAP_CACHE_PER_THREAD)
+	{
+		// Recycle the oldest entry at the back of the list
+		tl_height_map_cache.splice(tl_height_map_cache.begin(), tl_height_map_cache, std::prev(tl_height_map_cache.end()));
+	}
+	else
+	{
+		// Grow cache if not at limit
+		tl_height_map_cache.emplace_front();
+	}
+
+	active_height_map = &(*tl_height_map_cache.begin());
+	active_height_map->position = target_xz;
+
+	FastNoiseLite* base_noise_ptr = settings->height_base_noise.ptr();
+	FastNoiseLite* mult_noise_ptr = settings->height_multiplier_noise.ptr();
+	base_noise_ptr->set_offset(Vector3(p_chunk_world_pos.x, p_chunk_world_pos.z, 0));
+	mult_noise_ptr->set_offset(Vector3(p_chunk_world_pos.x, p_chunk_world_pos.z, 0));
+
+	float* out_ptr = active_height_map->data.data();
 
 	const float base_offset = settings->base_height_offset;
 	const float base_mult = settings->base_height_multiplier;
 
-	const int total_points = POINTS_SIZE * POINTS_SIZE;
-	for (int i = 0; i < total_points; ++i)
+	for (int z = 0; z < POINTS_SIZE; z++)
 	{
-		// Remap the image values as they only use the red channel for 8bit values 0-255
-		float height_base = uint8_to_float[base_ptr[i]];
-		float height_mult = uint8_to_float[mult_ptr[i]];
+		for (int x = 0; x < POINTS_SIZE; x++)
+		{
+			// Remap the image values as they only use the red channel for 8bit values 0-255
+			float height_base = base_noise_ptr->get_noise_2d(x, z);
+			float height_mult = mult_noise_ptr->get_noise_2d(x, z);
 
-		float height_offset = base_offset + 100.0f * height_mult;
-		float height = height_offset + height_base * base_mult;
-		out_ptr[i] = height;
+			float height_offset = base_offset + 100.0f * height_mult;
+			float height = height_offset + height_base * base_mult;
+			out_ptr[x + z * POINTS_SIZE] = height;
+		}
 	}
 
+	tl_height_map = active_height_map;
 	return true;
 }

@@ -10,15 +10,24 @@
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/wrapped.hpp>
 #include <godot_cpp/core/memory.hpp>
+#include <godot_cpp/variant/vector2i.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
+#include <array>
+#include <list>
+
 using namespace godot;
+
+// At 256 the uses over 1MiB per thread
+constexpr int HEIGHT_MAP_CACHE_PER_THREAD = 256;
 
 class ChunkGeneratorSettings : public Resource
 {
 	GDCLASS(ChunkGeneratorSettings, Resource)
 
 public:
+	// TODO: Look into using a FastNoise2 godot extension to use SIMD `GenUniformGrid`
+
 	// Modifies where the terrain height should start int base_height_offset;
 	float base_height_offset = 0.0f;
 	// Base height. Creates the initial variations in terrain
@@ -71,10 +80,16 @@ protected:
 	static void _bind_methods() {}
 
 private:
-	// scratch pad for height map
-	static thread_local float tl_height_map[terrain_constants::POINTS_AREA];
 	static thread_local float uint8_to_float[256];
 	bool generate_height_map(const Vector3& p_chunk_world_pos) const;
 
 	Ref<ChunkGeneratorSettings> settings;
+	struct alignas(64) HeightMap
+	{
+		Vector2i position;
+		std::array<float, terrain_constants::POINTS_AREA> data{};
+	};
+	static thread_local HeightMap* tl_height_map;
+	// scratch pad for height map, storing the most recently used height maps for re-use
+	static thread_local std::list<HeightMap> tl_height_map_cache;
 };
