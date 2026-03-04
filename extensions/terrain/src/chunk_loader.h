@@ -1,8 +1,10 @@
 #pragma once
 
+#include "chunk.h"
 #include "chunk_data.h"
 #include "chunk_generator.h"
 #include "chunk_viewer.h"
+#include "collision_generator.h"
 #include "concurrent_chunk_map.h"
 #include "mesh_generator.h"
 #include "mesh_generator_pool.h"
@@ -69,7 +71,7 @@ protected:
 	void set_material(Ref<StandardMaterial3D> p_material) { material = p_material; }
 
 private:
-	MeshInstance3D* get_chunk(Vector3i chunk_pos);
+	Chunk* get_chunk(Vector3i chunk_pos);
 
 	void try_update_chunks();
 	void _update_chunks();
@@ -78,8 +80,11 @@ private:
 
 	std::shared_ptr<ConcurrentChunkMap> chunk_map;
 
-	HashMap<Vector3i, MeshInstance3D*> chunk_node_map{};
+	HashMap<Vector3i, Chunk*> chunk_node_map{};
 	std::vector<MeshData> mesh_datas{};
 
 	Ref<ThreadPool<ChunkGenerator, ChunkData*, ChunkData*>> chunk_generator_pool;
+
+	using CollisionGeneratorPool = ThreadPool<CollisionGenerator, MeshData, CollisionData>;
+	Ref<CollisionGeneratorPool> collision_generator_pool;
 };

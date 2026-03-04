@@ -2,6 +2,7 @@
 
 #include "chunk_data.h"
 #include "chunk_generator.h"
+#include "collision_generator.h"
 #include "concurrent_chunk_map.h"
 #include "godot_utility.h"
 #include "mesh_generator.h"
@@ -28,10 +29,12 @@
 #include <godot_cpp/variant/vector3i.hpp>
 
 #include <algorithm>
+#include <chunk.h>
 #include <cstdint>
 #include <cstdio>
 #include <iterator>
 #include <memory>
+#include <utility>
 #include <vector>
 
 using namespace godot;
@@ -94,7 +97,7 @@ bool ChunkLoader::init()
 	}
 	if (mesh_generator_pool->get_state() == MeshGeneratorPool::State::Stopped)
 	{
-		constexpr int64_t mesh_generator_thread_count = 1;
+		constexpr int64_t mesh_generator_thread_count = 2;
 		mesh_generator_pool->init(mesh_generator_thread_count);
 	}
 	else
@@ -117,6 +120,23 @@ bool ChunkLoader::init()
 	else
 	{
 		PRINT_ERROR("chunk_generator_pool is stopping! It can't be initialised.");
+		return false;
+	}
+
+	if (!collision_generator_pool.is_valid())
+	{
+		collision_generator_pool.reference_ptr(memnew((CollisionGeneratorPool)));
+	}
+
+	if (collision_generator_pool->get_state() == ThreadPoolState::Stopped)
+	{
+		constexpr int64_t collision_generator_thread_count = 1;
+		collision_generator_pool->init(collision_generator_thread_count, "", []()
+				{ return CollisionGenerator::create(); });
+	}
+	else
+	{
+		PRINT_ERROR("collision_generator_pool is stopping! It can't be initialised.");
 		return false;
 	}
 
@@ -155,6 +175,18 @@ void ChunkLoader::update()
 
 	{ // move the done meshes to our array so we can take time applying them
 		std::vector<MeshData> done_mesh_datas = mesh_generator_pool->take_done_mesh_data();
+
+		// TODO: only queue close chunks, use something the Chunk Viewer to manage this
+		Vector3 centre_pos = chunk_viewer->get_current_chunk_pos();
+		float collision_radius_sqr = 2 * 2;
+		for (const MeshData& mesh_data : done_mesh_datas)
+		{
+			if (centre_pos.distance_squared_to(mesh_data.chunk_pos) < collision_radius_sqr)
+			{
+				collision_generator_pool->queue_task(done_mesh_datas);
+			}
+		}
+
 		if (!done_mesh_datas.empty())
 		{
 			mesh_datas.insert(
@@ -189,25 +221,15 @@ void ChunkLoader::update()
 		MeshData mesh_data = mesh_datas.back();
 		mesh_datas.pop_back();
 
-		MeshInstance3D* chunk = get_chunk(mesh_data.chunk_pos);
+		Chunk* chunk = get_chunk(mesh_data.chunk_pos);
+		chunk->update_chunk_mesh(mesh_data);
+	}
 
-		Ref<ArrayMesh> array_mesh = chunk->get_mesh();
-		if (array_mesh.is_null())
-		{
-			PRINT_ERROR("array_mesh is invalid");
-			continue;
-		}
-
-		// remove all old surface meshes
-		while (array_mesh->get_surface_count() > 0)
-		{
-			array_mesh->surface_remove(0);
-		}
-
-		if (mesh_data.vertex_count > 0 && !mesh_data.mesh_arrays.is_empty())
-		{
-			array_mesh->add_surface_from_arrays(Mesh::PrimitiveType::PRIMITIVE_TRIANGLES, mesh_data.mesh_arrays);
-		}
+	std::vector<CollisionData> collision_datas = collision_generator_pool->take_results();
+	for (CollisionData& collision_data : collision_datas)
+	{
+		Chunk* chunk = get_chunk(collision_data.chunk_pos);
+		chunk->update_chunk_collision(collision_data);
 	}
 }
 
@@ -238,6 +260,11 @@ void ChunkLoader::try_update_chunks()
 	}
 
 	if (chunk_generator_pool->get_task_count() > 2048)
+	{
+		return;
+	}
+
+	if (mesh_datas.size() > 1024)
 	{
 		return;
 	}
@@ -288,7 +315,7 @@ void ChunkLoader::unload_all()
 	}
 }
 
-MeshInstance3D* ChunkLoader::get_chunk(Vector3i chunk_pos)
+Chunk* ChunkLoader::get_chunk(Vector3i chunk_pos)
 {
 	auto it = chunk_node_map.find(chunk_pos);
 	if (it != chunk_node_map.end())
@@ -296,25 +323,20 @@ MeshInstance3D* ChunkLoader::get_chunk(Vector3i chunk_pos)
 		return it->value;
 	}
 
-	MeshInstance3D* mesh_instance = memnew(MeshInstance3D);
+	Chunk* chunk = memnew(Chunk);
 
-	Ref<ArrayMesh> array_mesh;
-	array_mesh.instantiate();
-	mesh_instance->set_mesh(array_mesh);
-
-	mesh_instance->set_position(chunk_pos * CHUNK_SIZE);
-
-	mesh_instance->set_material_override(material);
+	chunk->set_position(chunk_pos * CHUNK_SIZE);
+	chunk->set_material(material);
 
 #ifdef DEBUG_ENABLED
 	// The node name shouldn't be needed in release so we can skip it for a negligible speed increase
 	char buffer[32];
 	std::snprintf(buffer, sizeof(buffer), "Chunk_%d_%d_%d", chunk_pos.x, chunk_pos.y, chunk_pos.z);
-	mesh_instance->set_name(buffer);
+	chunk->set_name(buffer);
 #endif
 
-	add_child(mesh_instance);
-	chunk_node_map[chunk_pos] = mesh_instance;
+	add_child(chunk);
+	chunk_node_map[chunk_pos] = chunk;
 
-	return mesh_instance;
+	return chunk;
 }

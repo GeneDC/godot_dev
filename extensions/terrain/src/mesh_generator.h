@@ -2,6 +2,8 @@
 
 #include "chunk_data.h"
 
+#include <godot_cpp/classes/array_mesh.hpp>
+#include <godot_cpp/classes/concave_polygon_shape3d.hpp>
 #include <godot_cpp/classes/rd_sampler_state.hpp>
 #include <godot_cpp/classes/rd_shader_file.hpp>
 #include <godot_cpp/classes/rd_shader_spirv.hpp>
@@ -11,7 +13,6 @@
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/classes/rendering_device.hpp>
 #include <godot_cpp/classes/wrapped.hpp>
-#include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
 
@@ -22,7 +23,7 @@ using namespace godot;
 struct MeshData
 {
 	Vector3i chunk_pos{};
-	Array mesh_arrays{};
+	Ref<ArrayMesh> array_mesh;
 	uint32_t vertex_count = 0;
 };
 

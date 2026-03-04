@@ -28,6 +28,26 @@ var _e := false
 var _shift := false
 var _alt := false
 
+func spawn_sphere() -> void:
+	var mesh_instance = MeshInstance3D.new()
+	var sphere_mesh = SphereMesh.new()
+	sphere_mesh.radius = 0.5
+	sphere_mesh.height = 1.0
+	mesh_instance.mesh = sphere_mesh
+
+	var collision_shape = CollisionShape3D.new()
+	var sphere_shape = SphereShape3D.new()
+	sphere_shape.radius = 0.5
+	collision_shape.shape = sphere_shape
+	
+	var rigid_body = RigidBody3D.new()
+	rigid_body.add_child(mesh_instance)
+	rigid_body.add_child(collision_shape)
+
+	get_tree().root.add_child(rigid_body)
+
+	rigid_body.global_transform.origin = global_transform.origin
+
 func _input(event: InputEvent)->void:
 	# Receives mouse motion
 	if event is InputEventMouseMotion:
@@ -65,6 +85,9 @@ func _input(event: InputEvent)->void:
 				_shift = eventKey.pressed
 			KEY_ALT:
 				_alt = eventKey.pressed
+			KEY_V:
+				if (event.pressed):
+					spawn_sphere()
 
 # Updates mouselook and movement every frame
 func _process(delta: float) -> void:

@@ -52,11 +52,8 @@ protected:
 template <typename TProcessor, typename TTask, typename TResult>
 requires std::is_base_of_v<ITaskProcessor<TTask, TResult>, TProcessor> class ThreadPool : public ThreadPoolBase
 {
-	static_assert(std::is_trivially_destructible_v<TTask>);
-	static_assert(std::is_trivially_destructible_v<TResult>);
-	static_assert(std::is_trivially_constructible_v<TTask>);
-	static_assert(std::is_trivially_constructible_v<TResult>);
-	// Change these to std::is_copy_constructible_v if you want to use Ref<T> in the TTask or TResult
+	static_assert(std::is_copy_constructible_v<TTask>);
+	static_assert(std::is_copy_constructible_v<TResult>);
 
 public:
 	ThreadPoolState get_state() const { return state.load(); }

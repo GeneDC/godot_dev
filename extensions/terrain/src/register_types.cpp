@@ -1,8 +1,10 @@
 #include "register_types.h"
 
+#include "chunk.h"
 #include "chunk_generator.h"
 #include "chunk_loader.h"
 #include "chunk_viewer.h"
+#include "collision_generator.h"
 #include "mesh_generator.h"
 #include "mesh_generator_pool.h"
 #include "terrain_performance_monitor.h"
@@ -32,10 +34,12 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 	{
 		return;
 	}
+	GDREGISTER_CLASS(Chunk)
 	GDREGISTER_CLASS(ChunkGeneratorSettings)
 	GDREGISTER_CLASS(ChunkGenerator)
 	GDREGISTER_CLASS(ChunkLoader)
 	GDREGISTER_CLASS(ChunkViewer)
+	GDREGISTER_CLASS(CollisionGenerator)
 	GDREGISTER_CLASS(MeshGenerator)
 	GDREGISTER_CLASS(MeshGeneratorPool)
 	GDREGISTER_CLASS(ThreadPoolBase)
