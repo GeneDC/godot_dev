@@ -1,9 +1,9 @@
 #pragma once
 
+#include "abstract_task_processer.h"
 #include "chunk_data.h"
 
 #include <godot_cpp/classes/array_mesh.hpp>
-#include <godot_cpp/classes/concave_polygon_shape3d.hpp>
 #include <godot_cpp/classes/rd_sampler_state.hpp>
 #include <godot_cpp/classes/rd_shader_file.hpp>
 #include <godot_cpp/classes/rd_shader_spirv.hpp>
@@ -13,6 +13,7 @@
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/classes/rendering_device.hpp>
 #include <godot_cpp/classes/wrapped.hpp>
+#include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
 
@@ -27,18 +28,25 @@ struct MeshData
 	uint32_t vertex_count = 0;
 };
 
-class MeshGenerator : public RefCounted
+class MeshGenerator final : public ITaskProcessor<ChunkData*, MeshData>
 {
 	GDCLASS(MeshGenerator, RefCounted)
 
 public:
 	MeshGenerator() = default;
-	~MeshGenerator() override;
+	virtual ~MeshGenerator() override;
 
 	// Call once to setup. Creates local rendering device, loads shader, and setups the buffers and uniforms
 	bool init();
-	// Returns MeshData for a ArrayMesh using the compute shader results.
-	[[nodiscard]] MeshData generate_mesh_data(ChunkData* chunk_data);
+
+	static Ref<MeshGenerator> create()
+	{
+		Ref<MeshGenerator> mesh_generator = memnew((MeshGenerator));
+		mesh_generator->init();
+		return mesh_generator;
+	}
+
+	virtual MeshData process_task(ChunkData* chunk_data) override;
 
 protected:
 	static void _bind_methods() {};

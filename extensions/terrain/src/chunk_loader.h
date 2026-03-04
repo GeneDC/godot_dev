@@ -7,10 +7,8 @@
 #include "collision_generator.h"
 #include "concurrent_chunk_map.h"
 #include "mesh_generator.h"
-#include "mesh_generator_pool.h"
 #include "thread_pool.h"
 
-#include <godot_cpp/classes/mesh_instance3d.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/standard_material3d.hpp>
@@ -47,13 +45,13 @@ public:
 	bool can_stop() const { return state == State::Ready; }
 
 	Ref<ChunkGeneratorSettings> chunk_generator_settings;
-	Ref<MeshGeneratorPool> mesh_generator_pool;
 	ChunkViewer* chunk_viewer = nullptr; // TODO: Use a ObjectID instead. Using raw pointer isn't safe as it could become dangling.
 
 	State get_state() const { return state; }
 
 	std::weak_ptr<ConcurrentChunkMap> get_chunk_map() const { return chunk_map; }
 	int64_t get_pending_chunks_count() const { return chunk_generator_pool.is_valid() ? chunk_generator_pool->get_task_count() : 0; }
+	int64_t get_pending_mesh_tasks_count() const { return mesh_generator_pool.is_valid() ? mesh_generator_pool->get_task_count() : 0; }
 	int64_t get_mesh_datas_count() const { return mesh_datas.size(); }
 
 	Ref<StandardMaterial3D> material;
@@ -83,7 +81,11 @@ private:
 	HashMap<Vector3i, Chunk*> chunk_node_map{};
 	std::vector<MeshData> mesh_datas{};
 
-	Ref<ThreadPool<ChunkGenerator, ChunkData*, ChunkData*>> chunk_generator_pool;
+	using ChunkGeneratorPool = ThreadPool<ChunkGenerator, ChunkData*, ChunkData*>;
+	Ref<ChunkGeneratorPool> chunk_generator_pool;
+
+	using MeshGeneratorPool = ThreadPool<MeshGenerator, ChunkData*, MeshData>;
+	Ref<MeshGeneratorPool> mesh_generator_pool;
 
 	using CollisionGeneratorPool = ThreadPool<CollisionGenerator, MeshData, CollisionData>;
 	Ref<CollisionGeneratorPool> collision_generator_pool;

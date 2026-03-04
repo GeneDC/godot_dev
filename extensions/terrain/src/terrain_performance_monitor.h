@@ -5,7 +5,6 @@
 
 #include <cstdint>
 #include <memory>
-#include "mesh_generator_pool.h"
 
 using namespace godot;
 
@@ -30,6 +29,7 @@ public:
 	float get_chunks_ps();
 	float get_mesh_tasks_ps();
 	int64_t get_pending_chunks_count();
+	int64_t get_pending_mesh_tasks_count();
 	int64_t get_done_mesh_data_count();
 
 protected:
@@ -38,7 +38,6 @@ protected:
 private:
 	ChunkLoader* chunk_loader = nullptr;
 	std::weak_ptr<ConcurrentChunkMap> chunk_map{};
-	MeshGeneratorPool* mesh_generator_pool = nullptr;
 
 	float chunk_count_ps = 0.0f;
 	int64_t last_chunk_time = 0;

@@ -55,11 +55,6 @@ void TerrainPerformanceMonitor::set_chunk_loader(ChunkLoader* p_chunk_loader)
 	chunk_loader = p_chunk_loader;
 
 	chunk_map = chunk_loader->get_chunk_map();
-
-	if (chunk_loader->mesh_generator_pool.is_valid())
-	{
-		mesh_generator_pool = chunk_loader->mesh_generator_pool.ptr();
-	}
 }
 
 int64_t TerrainPerformanceMonitor::get_chunks()
@@ -119,12 +114,7 @@ float TerrainPerformanceMonitor::get_chunks_ps()
 
 float TerrainPerformanceMonitor::get_mesh_tasks_ps()
 {
-	if (!mesh_generator_pool)
-	{
-		return 0.0f;
-	}
-
-	int64_t current_tasks = mesh_generator_pool->get_task_count();
+	int64_t current_tasks = get_pending_mesh_tasks_count();
 	int64_t max_capacity = 256; // mesh_generator_pool->get_max_capacity();
 
 	if (max_capacity == 0) return 0.0f;
@@ -140,6 +130,11 @@ float TerrainPerformanceMonitor::get_mesh_tasks_ps()
 int64_t TerrainPerformanceMonitor::get_pending_chunks_count()
 {
 	return chunk_loader ? chunk_loader->get_pending_chunks_count() : 0;
+}
+
+int64_t TerrainPerformanceMonitor::get_pending_mesh_tasks_count()
+{
+	return chunk_loader ? chunk_loader->get_pending_mesh_tasks_count() : 0;
 }
 
 int64_t TerrainPerformanceMonitor::get_done_mesh_data_count()

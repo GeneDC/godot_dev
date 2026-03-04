@@ -4,7 +4,7 @@
 #include "godot_utility.h"
 #include "terrain_constants.h"
 
-#include <godot_cpp/classes/concave_polygon_shape3d.hpp>
+#include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/mesh.hpp>
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/rd_uniform.hpp>
@@ -13,16 +13,14 @@
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/core/memory.hpp>
+#include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
-#include <godot_cpp/variant/packed_vector3_array.hpp>
 #include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
 
 #include <cstdint>
 #include <cstring>
-#include <godot_cpp/classes/array_mesh.hpp>
-#include <godot_cpp/variant/array.hpp>
 
 using namespace godot;
 using namespace terrain_constants;
@@ -164,7 +162,7 @@ bool MeshGenerator::init()
 	return true;
 }
 
-MeshData MeshGenerator::generate_mesh_data(ChunkData* chunk_data)
+MeshData MeshGenerator::process_task(ChunkData* chunk_data)
 {
 	MeshData mesh_data{};
 	mesh_data.chunk_pos = chunk_data->position;
@@ -244,7 +242,7 @@ MeshData MeshGenerator::generate_mesh_data(ChunkData* chunk_data)
 		mesh_arrays.resize(Mesh::ARRAY_MAX);
 
 		PackedByteArray vertex_data = local_rendering_device->buffer_get_data(vertex_buffer, 0, vertex_count * sizeof(float) * 3);
-		mesh_arrays[Mesh::ARRAY_VERTEX]= vertex_data.to_vector3_array();
+		mesh_arrays[Mesh::ARRAY_VERTEX] = vertex_data.to_vector3_array();
 
 		PackedByteArray normal_data = local_rendering_device->buffer_get_data(normal_buffer, 0, vertex_count * sizeof(float) * 3);
 		mesh_arrays[Mesh::ARRAY_NORMAL] = normal_data.to_vector3_array();

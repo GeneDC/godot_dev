@@ -6,15 +6,11 @@
 #include "concurrent_chunk_map.h"
 #include "godot_utility.h"
 #include "mesh_generator.h"
-#include "mesh_generator_pool.h"
 #include "terrain_constants.h"
 #include "terrain_performance_monitor.h"
 #include "thread_pool.h"
 
-#include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/global_constants.hpp>
-#include <godot_cpp/classes/mesh.hpp>
-#include <godot_cpp/classes/mesh_instance3d.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/time.hpp>
 #include <godot_cpp/classes/worker_thread_pool.hpp>
@@ -34,7 +30,6 @@
 #include <cstdio>
 #include <iterator>
 #include <memory>
-#include <utility>
 #include <vector>
 
 using namespace godot;
@@ -93,12 +88,14 @@ bool ChunkLoader::init()
 
 	if (!mesh_generator_pool.is_valid())
 	{
-		mesh_generator_pool.instantiate();
+		mesh_generator_pool.reference_ptr(memnew((MeshGeneratorPool)));
 	}
-	if (mesh_generator_pool->get_state() == MeshGeneratorPool::State::Stopped)
+
+	if (mesh_generator_pool->get_state() == ThreadPoolState::Stopped)
 	{
-		constexpr int64_t mesh_generator_thread_count = 2;
-		mesh_generator_pool->init(mesh_generator_thread_count);
+		constexpr int64_t mesh_generator_thread_count = 1;
+		mesh_generator_pool->init(mesh_generator_thread_count, "", []()
+				{ return MeshGenerator::create(); });
 	}
 	else
 	{
@@ -108,7 +105,7 @@ bool ChunkLoader::init()
 
 	if (!chunk_generator_pool.is_valid())
 	{
-		chunk_generator_pool.reference_ptr(memnew((ThreadPool<ChunkGenerator, ChunkData*, ChunkData*>)));
+		chunk_generator_pool.reference_ptr(memnew((ChunkGeneratorPool)));
 	}
 
 	if (chunk_generator_pool->get_state() == ThreadPoolState::Stopped)
@@ -174,7 +171,7 @@ void ChunkLoader::update()
 	constexpr uint64_t time_budget = 4000;
 
 	{ // move the done meshes to our array so we can take time applying them
-		std::vector<MeshData> done_mesh_datas = mesh_generator_pool->take_done_mesh_data();
+		std::vector<MeshData> done_mesh_datas = mesh_generator_pool->take_results();
 
 		// TODO: only queue close chunks, use something the Chunk Viewer to manage this
 		Vector3 centre_pos = chunk_viewer->get_current_chunk_pos();
@@ -300,7 +297,7 @@ void ChunkLoader::_update_chunks()
 	// Remove empty and full chunks as they don't need to be generated
 	std::erase_if(chunk_datas, [](ChunkData* chunk_data)
 			{ return chunk_data->surface_state != SurfaceState::MIXED; });
-	mesh_generator_pool->queue_generate_mesh_data(chunk_datas);
+	mesh_generator_pool->queue_task(chunk_datas);
 }
 
 void ChunkLoader::unload_all()
