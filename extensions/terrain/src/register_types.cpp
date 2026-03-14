@@ -6,7 +6,6 @@
 #include "chunk_viewer.h"
 #include "collision_generator.h"
 #include "mesh_generator.h"
-#include "mesh_generator_pool.h"
 #include "terrain_performance_monitor.h"
 #include "thread_pool.h"
 
@@ -41,7 +40,6 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 	GDREGISTER_CLASS(ChunkViewer)
 	GDREGISTER_CLASS(CollisionGenerator)
 	GDREGISTER_CLASS(MeshGenerator)
-	GDREGISTER_CLASS(MeshGeneratorPool)
 	GDREGISTER_CLASS(ThreadPoolBase)
 }
 

@@ -3,11 +3,13 @@
 #include "abstract_task_processer.h"
 #include "mesh_generator.h"
 
+#include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/concave_polygon_shape3d.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/classes/wrapped.hpp>
 #include <godot_cpp/core/memory.hpp>
+#include <godot_cpp/variant/packed_vector3_array.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
 
 using namespace godot;
@@ -38,4 +40,5 @@ protected:
 	static void _bind_methods() {}
 
 private:
+	Ref<ArrayMesh> optimise_mesh(const PackedVector3Array& verts);
 };
