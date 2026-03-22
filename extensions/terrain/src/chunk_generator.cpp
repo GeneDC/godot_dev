@@ -5,16 +5,13 @@
 
 #include <godot_cpp/classes/fast_noise_lite.hpp>
 #include <godot_cpp/classes/global_constants.hpp>
-#include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/noise.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/core/print_string.hpp>
 #include <godot_cpp/core/property_info.hpp>
-#include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/variant.hpp>
-#include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/vector2i.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector3i.hpp>

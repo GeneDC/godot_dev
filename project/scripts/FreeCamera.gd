@@ -4,7 +4,6 @@ class_name FreeLookCamera extends Camera3D
 const SHIFT_MULTIPLIER: float = 20.5
 const ALT_MULTIPLIER: float = 1.0 / SHIFT_MULTIPLIER
 
-
 @export_range(0.0, 1.0) var sensitivity: float = 0.25
 
 # Mouse state
@@ -29,18 +28,18 @@ var _shift := false
 var _alt := false
 
 func spawn_sphere() -> void:
-	var mesh_instance = MeshInstance3D.new()
-	var sphere_mesh = SphereMesh.new()
+	var mesh_instance := MeshInstance3D.new()
+	var sphere_mesh := SphereMesh.new()
 	sphere_mesh.radius = 0.5
 	sphere_mesh.height = 1.0
 	mesh_instance.mesh = sphere_mesh
 
-	var collision_shape = CollisionShape3D.new()
-	var sphere_shape = SphereShape3D.new()
+	var collision_shape := CollisionShape3D.new()
+	var sphere_shape := SphereShape3D.new()
 	sphere_shape.radius = 0.5
 	collision_shape.shape = sphere_shape
 	
-	var rigid_body = RigidBody3D.new()
+	var rigid_body := RigidBody3D.new()
 	rigid_body.add_child(mesh_instance)
 	rigid_body.add_child(collision_shape)
 
@@ -48,7 +47,7 @@ func spawn_sphere() -> void:
 
 	rigid_body.global_transform.origin = global_transform.origin
 
-func _input(event: InputEvent)->void:
+func _unhandled_input(event: InputEvent)-> void:
 	# Receives mouse motion
 	if event is InputEventMouseMotion:
 		var eventMouseMotion := event as InputEventMouseMotion
@@ -86,7 +85,7 @@ func _input(event: InputEvent)->void:
 			KEY_ALT:
 				_alt = eventKey.pressed
 			KEY_V:
-				if (event.pressed):
+				if (eventKey.pressed):
 					spawn_sphere()
 
 # Updates mouselook and movement every frame
@@ -126,7 +125,7 @@ func _update_movement(delta: float) -> void:
 		translate(_velocity * delta * speed_multi)
 
 # Updates mouse look 
-func _update_mouselook()-> void:
+func _update_mouselook() -> void:
 	# Only rotates mouse if the mouse is captured
 	if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
 		_mouse_position *= sensitivity
