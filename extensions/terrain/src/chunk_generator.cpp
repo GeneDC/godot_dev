@@ -46,6 +46,8 @@ ChunkData* ChunkGenerator::process_task(ChunkData* chunk_data)
 {
 	// NOTE: this currently generates a chunk size + 1 array, but a chunk only needs the chunk size data and the extra data can be added before it's sent to the shader
 
+	chunk_data->surface_sum = 0;
+
 	Vector3 chunk_world_pos = chunk_data->position * CHUNK_SIZE;
 	bool did_generate_height_map = generate_height_map(chunk_world_pos);
 	if (!did_generate_height_map)
@@ -56,7 +58,6 @@ ChunkData* ChunkGenerator::process_task(ChunkData* chunk_data)
 	const float* height_map_ptr = tl_height_map->data.data();
 	uint8_t* points_ptr = chunk_data->points.data();
 
-	float count = 0.0f;
 	for (int z = 0; z < POINTS_SIZE; z++)
 	{
 		const int world_z = z + chunk_world_pos.z;
@@ -74,17 +75,18 @@ ChunkData* ChunkGenerator::process_task(ChunkData* chunk_data)
 				value = (value < 0.0f) ? 0.0f : (value > 1.0f ? 1.0f : value); // CLAMP 0-1
 				//value = CLAMP(value - density, 0.0f, 1.0f);
 
-				count += value;
-				points_ptr[x + y * POINTS_SIZE + z * POINTS_AREA] = static_cast<uint8_t>(value * 255.0f + 0.5f);
+				uint8_t int_value = static_cast<uint8_t>(value * 255.0f + 0.5f);
+				chunk_data->surface_sum += int_value;
+				points_ptr[x + y * POINTS_SIZE + z * POINTS_AREA] = int_value;
 			}
 		}
 	}
 
-	if (count == 0.0f)
+	if (chunk_data->surface_sum == 0)
 	{
 		chunk_data->surface_state = SurfaceState::EMPTY;
 	}
-	else if (count == POINTS_VOLUME)
+	else if (chunk_data->surface_sum == POINTS_VOLUME)
 	{
 		chunk_data->surface_state = SurfaceState::FULL;
 	}

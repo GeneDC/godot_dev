@@ -14,6 +14,7 @@
 #include <godot_cpp/classes/standard_material3d.hpp>
 #include <godot_cpp/classes/wrapped.hpp>
 #include <godot_cpp/templates/hash_map.hpp>
+#include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
 
 #include <cstdint>
@@ -48,6 +49,8 @@ public:
 	ChunkViewer* chunk_viewer = nullptr; // TODO: Use a ObjectID instead. Using raw pointer isn't safe as it could become dangling.
 
 	State get_state() const { return state; }
+
+	void modify_terrain(Vector3 global_position, bool is_subtract = false);
 
 	std::weak_ptr<ConcurrentChunkMap> get_chunk_map() const { return chunk_map; }
 	int64_t get_pending_chunks_count() const { return chunk_generator_pool.is_valid() ? chunk_generator_pool->get_task_count() : 0; }

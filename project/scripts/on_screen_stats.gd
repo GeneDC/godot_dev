@@ -32,6 +32,12 @@ func _process(_delta: float) -> void:
 		var value: Variant = monitors[key].call()
 		display_text += str(key, ": ", value, "\n")
 	
+	var chunk_loader := GlobalChunkLoader as ChunkLoader
+	if chunk_loader:
+		var chunk_viewer := chunk_loader.get_chunk_viewer()
+		if chunk_viewer:
+			display_text += str("Chunk Coord: ", chunk_viewer.get_current_chunk_pos(), "\n")
+	
 	label.text = display_text
 
 func _input(event: InputEvent) -> void:

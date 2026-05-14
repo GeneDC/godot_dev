@@ -28,7 +28,7 @@ public:
 	void _process(double delta) override; // _process must be public
 
 protected:
-	static void _bind_methods() {};
+	static void _bind_methods();
 
 private:
 	void update_view();

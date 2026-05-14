@@ -1,0 +1,11 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3 uid="uid://ckmgvx5xco7uu"]
+
+[ext_resource type="Shader" uid="uid://ti7iqwwnhfq5" path="res://Shaders/DebugGridShader.gdshader" id="1_ny7cq"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_ny7cq")
+shader_parameter/start_fade_in = 1.5
+shader_parameter/end_fade_in = 3.0
+shader_parameter/start_fade_out = 4.0
+shader_parameter/end_fade_out = 8.0

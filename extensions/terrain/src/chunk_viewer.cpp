@@ -3,12 +3,18 @@
 #include "chunk_lut.gen.h"
 #include "terrain_constants.h"
 
+#include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
 
 #include <cstdint>
 #include <vector>
 
 using namespace godot;
+
+void ChunkViewer::_bind_methods()
+{
+	ClassDB::bind_method(D_METHOD("get_current_chunk_pos"), &ChunkViewer::get_current_chunk_pos);
+}
 
 std::vector<Vector3i> ChunkViewer::get_chunk_positions(int64_t max_count)
 {
@@ -53,7 +59,7 @@ void ChunkViewer::reset()
 
 Vector3i ChunkViewer::get_current_chunk_pos() const
 {
-	return Vector3i((get_global_position() / terrain_constants::CHUNK_SIZE).floor());
+	return Vector3i((get_global_position() / (float)terrain_constants::CHUNK_SIZE).floor());
 }
 
 void ChunkViewer::_process(double delta)

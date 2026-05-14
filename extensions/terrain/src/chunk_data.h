@@ -21,6 +21,7 @@ struct alignas(64) ChunkData
 {
 	std::array<uint8_t, terrain_constants::POINTS_VOLUME> points{};
 	Vector3i position{};
+	int surface_sum{0};
 	SurfaceState surface_state = SurfaceState::EMPTY;
 };
 

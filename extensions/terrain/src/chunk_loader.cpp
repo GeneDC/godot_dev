@@ -15,6 +15,8 @@
 #include <godot_cpp/classes/time.hpp>
 #include <godot_cpp/classes/worker_thread_pool.hpp>
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/core/defs.hpp>
+#include <godot_cpp/core/math.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/core/property_info.hpp>
@@ -46,6 +48,8 @@ void ChunkLoader::_bind_methods()
 	ClassDB::bind_method(D_METHOD("can_init"), &ChunkLoader::can_init);
 	ClassDB::bind_method(D_METHOD("can_update"), &ChunkLoader::can_update);
 	ClassDB::bind_method(D_METHOD("can_stop"), &ChunkLoader::can_stop);
+
+	ClassDB::bind_method(D_METHOD("modify_terrain", "global_position", "is_subtract"), &ChunkLoader::modify_terrain);
 
 	ClassDB::bind_method(D_METHOD("get_chunk_viewer"), &ChunkLoader::get_chunk_viewer);
 	ClassDB::bind_method(D_METHOD("set_chunk_viewer", "chunk_viewer"), &ChunkLoader::set_chunk_viewer);
@@ -310,6 +314,86 @@ void ChunkLoader::unload_all()
 	{
 		chunk_viewer->reset();
 	}
+}
+
+void ChunkLoader::modify_terrain(Vector3 global_position, bool is_subtract)
+{
+	Vector3i chunk_pos = Vector3i(
+			(int)Math::floor(global_position.x / CHUNK_SIZE),
+			(int)Math::floor(global_position.y / CHUNK_SIZE),
+			(int)Math::floor(global_position.z / CHUNK_SIZE));
+	ChunkData* chunk_data = chunk_map->get_chunk(chunk_pos);
+	if (!chunk_data)
+	{
+		PRINT_ERROR("can't find chunk for modification!");
+		return;
+	}
+
+	// TODO: Find/Load and Modify the surrounding chunks
+
+	if (is_subtract && chunk_data->surface_state == SurfaceState::EMPTY)
+	{
+		return;
+	}
+	if (!is_subtract && chunk_data->surface_state == SurfaceState::FULL)
+	{
+		return;
+	}
+
+	Vector3 position;
+	position.x = global_position.x - (float)(chunk_pos.x * CHUNK_SIZE);
+	position.y = global_position.y - (float)(chunk_pos.y * CHUNK_SIZE);
+	position.z = global_position.z - (float)(chunk_pos.z * CHUNK_SIZE);
+
+	float radius = 3;
+	float radius_sqr = radius * radius;
+
+	// Determine local bounds
+	int x_min = CLAMP((int)Math::floor(position.x - radius), 0, POINTS_SIZE - 1);
+	int x_max = CLAMP((int)Math::floor(position.x + radius), 0, POINTS_SIZE - 1);
+	int y_min = CLAMP((int)Math::floor(position.y - radius), 0, POINTS_SIZE - 1);
+	int y_max = CLAMP((int)Math::floor(position.y + radius), 0, POINTS_SIZE - 1);
+	int z_min = CLAMP((int)Math::floor(position.z - radius), 0, POINTS_SIZE - 1);
+	int z_max = CLAMP((int)Math::floor(position.z + radius), 0, POINTS_SIZE - 1);
+
+	for (int z = z_min; z <= z_max; ++z)
+	{
+		for (int y = y_min; y <= y_max; ++y)
+		{
+			for (int x = x_min; x <= x_max; ++x)
+			{
+				int index = x + (y * POINTS_SIZE) + (z * POINTS_AREA);
+
+				// Sphere distance check
+				Vector3 voxel_pos(x, y, z);
+				float dist_sqr = voxel_pos.distance_squared_to(position);
+				if (dist_sqr <= radius_sqr)
+				{
+					uint8_t old_value = chunk_data->points[index];
+					uint8_t new_value = is_subtract ? 0 : 255;
+
+					chunk_data->surface_sum += new_value - old_value;
+
+					chunk_data->points[index] = new_value;
+				}
+			}
+		}
+	}
+
+	if (chunk_data->surface_sum == 0)
+	{
+		chunk_data->surface_state = SurfaceState::EMPTY;
+	}
+	else if (chunk_data->surface_sum == (float)POINTS_VOLUME)
+	{
+		chunk_data->surface_state = SurfaceState::FULL;
+	}
+	else
+	{
+		chunk_data->surface_state = SurfaceState::MIXED;
+	}
+
+	mesh_generator_pool->queue_task(chunk_data, true);
 }
 
 Chunk* ChunkLoader::get_chunk(Vector3i chunk_pos)
