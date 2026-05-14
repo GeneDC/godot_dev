@@ -49,18 +49,17 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		if chunk_loader.can_update():
 			chunk_loader.unload_all()
 
-var grid_size := Vector3i(1, 1, 1)
 var debug_grid_mesh_instance: MeshInstance3D
 var debug_grid_mesh: ImmediateMesh
 var debug_grid_material: ShaderMaterial = preload("res://Materials/DebugGridMaterial.tres")
 var debug_grid_distance := 4
+const chunk_size := 32
 
 func _debug_update_grid() -> void:
 	var chunk_viewer := chunk_loader.get_chunk_viewer()
 	if (not chunk_viewer or not debug_grid_mesh_instance):
 		return
 	
-	var chunk_size := 32
 	var chunk_coord := chunk_viewer.get_current_chunk_pos()
 	chunk_coord += Vector3i.BACK
 	#chunk_coord += Vector3i.LEFT
@@ -80,32 +79,60 @@ func _debug_show_grid() -> void:
 		debug_grid_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
 		
 		# z
-		_debug_draw_grid_line(Vector3.FORWARD, Vector3.ZERO)
-		_debug_draw_grid_line(Vector3.FORWARD, Vector3.RIGHT)
-		_debug_draw_grid_line(Vector3.FORWARD, Vector3.UP)
-		_debug_draw_grid_line(Vector3.FORWARD, Vector3.RIGHT + Vector3.UP)
+		_debug_draw_grid_line(Vector3.FORWARD, Vector3.ZERO, debug_grid_distance)
+		_debug_draw_grid_line(Vector3.FORWARD, Vector3.RIGHT, debug_grid_distance)
+		_debug_draw_grid_line(Vector3.FORWARD, Vector3.UP, debug_grid_distance)
+		_debug_draw_grid_line(Vector3.FORWARD, Vector3.RIGHT + Vector3.UP, debug_grid_distance)
 		
 		# x
-		_debug_draw_grid_line(Vector3.RIGHT, Vector3.ZERO)
-		_debug_draw_grid_line(Vector3.RIGHT, Vector3.FORWARD)
-		_debug_draw_grid_line(Vector3.RIGHT, Vector3.UP)
-		_debug_draw_grid_line(Vector3.RIGHT, Vector3.FORWARD + Vector3.UP)
+		_debug_draw_grid_line(Vector3.RIGHT, Vector3.ZERO, debug_grid_distance)
+		_debug_draw_grid_line(Vector3.RIGHT, Vector3.FORWARD, debug_grid_distance)
+		_debug_draw_grid_line(Vector3.RIGHT, Vector3.UP, debug_grid_distance)
+		_debug_draw_grid_line(Vector3.RIGHT, Vector3.FORWARD + Vector3.UP, debug_grid_distance)
 		
 		# y
-		_debug_draw_grid_line(Vector3.UP, Vector3.ZERO)
-		_debug_draw_grid_line(Vector3.UP, Vector3.FORWARD)
-		_debug_draw_grid_line(Vector3.UP, Vector3.RIGHT)
-		_debug_draw_grid_line(Vector3.UP, Vector3.FORWARD + Vector3.RIGHT)
+		_debug_draw_grid_line(Vector3.UP, Vector3.ZERO, debug_grid_distance)
+		_debug_draw_grid_line(Vector3.UP, Vector3.FORWARD, debug_grid_distance)
+		_debug_draw_grid_line(Vector3.UP, Vector3.RIGHT, debug_grid_distance)
+		_debug_draw_grid_line(Vector3.UP, Vector3.FORWARD + Vector3.RIGHT, debug_grid_distance)
+		
+		# y plane
+		_debug_draw_grid_plane(Vector3.ZERO, Vector3.FORWARD, Vector3.RIGHT)
+		_debug_draw_grid_plane(Vector3.UP * chunk_size, Vector3.FORWARD, Vector3.RIGHT)
+		_debug_draw_grid_plane(Vector3.ZERO, Vector3.RIGHT, Vector3.FORWARD)
+		_debug_draw_grid_plane(Vector3.UP * chunk_size, Vector3.RIGHT, Vector3.FORWARD)
+		
+		# x plane
+		_debug_draw_grid_plane(Vector3.ZERO, Vector3.UP, Vector3.RIGHT)
+		_debug_draw_grid_plane(Vector3.FORWARD * chunk_size, Vector3.UP, Vector3.RIGHT)
+		_debug_draw_grid_plane(Vector3.ZERO, Vector3.RIGHT, Vector3.UP)
+		_debug_draw_grid_plane(Vector3.FORWARD * chunk_size, Vector3.RIGHT, Vector3.UP)
+		
+		# z plane
+		_debug_draw_grid_plane(Vector3.ZERO, Vector3.UP, Vector3.FORWARD)
+		_debug_draw_grid_plane(Vector3.RIGHT * chunk_size, Vector3.UP, Vector3.FORWARD)
+		_debug_draw_grid_plane(Vector3.ZERO, Vector3.FORWARD, Vector3.UP)
+		_debug_draw_grid_plane(Vector3.RIGHT * chunk_size, Vector3.FORWARD, Vector3.UP)
 		
 		debug_grid_mesh.surface_end()
 		
-		var chunk_size := 32
 		debug_grid_mesh_instance.scale = Vector3.ONE * chunk_size
 	
 	debug_grid_mesh_instance.visible = true
 
-func _debug_draw_grid_line(normal: Vector3, position: Vector3) -> void:
-	debug_grid_mesh.surface_set_normal(normal)
-	debug_grid_mesh.surface_add_vertex(position + -normal * debug_grid_distance)
-	debug_grid_mesh.surface_set_normal(normal)
-	debug_grid_mesh.surface_add_vertex(position + normal * debug_grid_distance)
+func _debug_draw_grid_line(axis: Vector3, position: Vector3, distance: float) -> void:
+	debug_grid_mesh.surface_set_normal(axis)
+	debug_grid_mesh.surface_add_vertex(position + -axis * distance)
+	debug_grid_mesh.surface_set_normal(axis)
+	debug_grid_mesh.surface_add_vertex(position + axis * distance)
+	
+func _debug_draw_grid_plane(origin: Vector3, axisA: Vector3, axisB: Vector3) -> void:
+	const subdivisions := 3
+	const dist_between_lines := chunk_size >> subdivisions
+	const line_count := 1 << subdivisions
+	for i in line_count:
+		var position := origin + (axisA * (i + 1) * dist_between_lines)
+		debug_grid_mesh.surface_set_normal(axisA)
+		debug_grid_mesh.surface_add_vertex(position / chunk_size)
+		debug_grid_mesh.surface_set_normal(axisA)
+		debug_grid_mesh.surface_add_vertex((position + axisB * chunk_size) / chunk_size)
