@@ -29,20 +29,14 @@ jobs:
         # See https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/running-variations-of-jobs-in-a-workflow
         target:
           [
-            { platform: linux, arch: x86_64, os: ubuntu-22.04 },
-            { platform: linux, arch: x86_32, os: ubuntu-22.04 },
-            { platform: linux, arch: arm64, os: ubuntu-22.04-arm },
-            { platform: linux, arch: arm32, os: ubuntu-22.04-arm },
-            { platform: windows, arch: x86_64, os: windows-latest },
-            { platform: windows, arch: x86_32, os: windows-latest },
-            { platform: windows, arch: arm64, os: windows-latest },
-            { platform: macos, arch: universal, os: macos-latest },
-            { platform: android, arch: x86_64, os: ubuntu-22.04 },
-            { platform: android, arch: x86_32, os: ubuntu-22.04 },
-            { platform: android, arch: arm64, os: ubuntu-22.04 },
-            { platform: android, arch: arm32, os: ubuntu-22.04 },
-            { platform: ios, arch: arm64, os: macos-latest },
-            { platform: web, arch: wasm32, os: ubuntu-22.04 },
+            { platform: linux, arch: x86_64, os: ubuntu-22.04, flags: "" },
+            { platform: linux, arch: arm64, os: ubuntu-22.04-arm, flags: "" },
+            { platform: windows, arch: x86_64, os: windows-latest, flags: "-A x64" },
+            { platform: windows, arch: arm64, os: windows-latest, flags: "-A ARM64" },
+            { platform: macos, arch: universal, os: macos-latest, flags: '-DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"' },
+            { platform: android, arch: x86_64, os: ubuntu-22.04, flags: '-DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_LATEST_HOME/build/cmake/android.toolchain.cmake" -DANDROID_ABI=x86_64 -DANDROID_PLATFORM=android-21' },
+            { platform: android, arch: arm64, os: ubuntu-22.04, flags: '-DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_LATEST_HOME/build/cmake/android.toolchain.cmake" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-21' },
+            { platform: ios, arch: arm64, os: macos-latest, flags: "-DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64" },
           ]
         target-type: [template_debug, template_release]
         float-precision: [single]
@@ -54,23 +48,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: true
-
-      # Lint
-      #- name: Setup clang-format
-      #  shell: bash
-      #  run: |
-      #    python -m pip install clang-format
-      #- name: Run clang-format
-      #  shell: bash
-      #  run: |
-      #    clang-format src/** --dry-run --Werror
-
-      # Add linux x86_32 toolchain
-      - name: Install multilib support
-        if: ${{ matrix.target.platform == 'linux' && matrix.target.arch == 'x86_32' }}
-        run: |
-          sudo apt-get update && sudo apt-get install -y gcc-multilib g++-multilib
+          submodules: recursive
 
       # Setup dependencies
       - name: Setup godot-cpp
@@ -79,33 +57,47 @@ jobs:
           platform: ${{ matrix.target.platform }}
           em-version: 3.1.62
 
+      # Setup the compiler environment specifically for Windows/MSVC
+      - name: Set up MSVC Developer Command Prompt
+        if: ${{ matrix.target.platform == 'windows' }}
+        uses: ilammy/msvc-dev-cmd@v1
+
       # Build GDExtension (with caches)
 
-      - name: Restore .scons_cache
-        uses: ./godot-cpp/.github/actions/godot-cache-restore
+      - name: Setup Cache
+        uses: hendrikmuhs/ccache-action@v1.2
         with:
-          scons-cache: ${{ github.workspace }}/.scons-cache/
-          cache-name: ${{ matrix.target.platform }}_${{ matrix.target.arch }}_${{ matrix.float-precision }}_${{ matrix.target-type }}
+          key: ${{ matrix.target.platform }}_${{ matrix.target.arch }}_${{ matrix.float-precision }}_${{ matrix.target-type }}
+          variant: sccache # Required for MSVC/Windows compiler caching tracking
 
-      - name: Build GDExtension Debug Build
-        shell: sh
-        env:
-          SCONS_CACHE: ${{ github.workspace }}/.scons-cache/
+      - name: Configure CMake
+        shell: bash
         run: |
-          scons target=${{ matrix.target-type }} platform=${{ matrix.target.platform }} arch=${{ matrix.target.arch }} precision=${{ matrix.float-precision }} projectdir_override=${{ matrix.projectdir }}
+          # Map Godot's build types (template, debug, release_debug) to CMake configurations
+          if [ "${{ matrix.target-type }}" = "template_release" ]; then
+            BUILD_TYPE="Release"
+          else
+            BUILD_TYPE="Debug"
+          fi
+          
+          cmake -B build -S . \
+            -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+            -DGD_ARCH=${{ matrix.target.arch }} \
+            -DGD_PRECISION=${{ matrix.float-precision }} \
+            -DGD_PROJECT_DIR=${{ matrix.projectdir }} \
+             ${{ matrix.target.flags }}
 
-      - name: Save .scons_cache
-        uses: ./godot-cpp/.github/actions/godot-cache-save
-        with:
-          scons-cache: ${{ github.workspace }}/.scons-cache/
-          cache-name: ${{ matrix.target.platform }}_${{ matrix.target.arch }}_${{ matrix.float-precision }}_${{ matrix.target-type }}
-
-      # Clean up compilation files
-      - name: Windows - Delete compilation files
-        if: ${{ matrix.target.platform == 'windows' }}
-        shell: pwsh
+      - name: Build GDExtension via CMake
+        shell: bash
         run: |
-          Remove-Item bin/* -Include *.exp,*.lib,*.pdb -Force
+          if [ "${{ matrix.target-type }}" = "template_release" ]; then
+            BUILD_TYPE="Release"
+          else
+            BUILD_TYPE="Debug"
+          fi
+          cmake --build build --config $BUILD_TYPE
 
       # Upload the build
       - name: Upload Artifact
