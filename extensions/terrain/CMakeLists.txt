@@ -14,14 +14,10 @@ find_program(GIT git REQUIRED)
 
 # Ensure godot-cpp submodule has been updated
 if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/godot-cpp/src")
-    message(NOTICE "godot-cpp bindings source not found")
-    message(NOTICE "initializing/updating the godot-cpp submodule...")
-
-    # update the c++ bindings submodule to populate it with the necessary source for the library
-    execute_process(
-        COMMAND git submodule update --init godot-cpp
-        WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
-        COMMAND_ERROR_IS_FATAL ANY
+	# Error instead of doing git commands in cmake
+    message(FATAL_ERROR 
+        "godot-cpp bindings source not found."
+        "Please check that submodules are active in the checkout workflow step."
     )
 endif()
 add_subdirectory(godot-cpp SYSTEM)
@@ -65,8 +61,8 @@ endif()
 
 target_link_libraries(${LIBNAME} PRIVATE godot-cpp)
 
-# Require at least C++17 for this target
-set_property(TARGET ${LIBNAME} PROPERTY CXX_STANDARD 17)
+# Require at least C++23 for this target
+set_property(TARGET ${LIBNAME} PROPERTY CXX_STANDARD 23)
 
 set_target_properties(${LIBNAME}
     PROPERTIES

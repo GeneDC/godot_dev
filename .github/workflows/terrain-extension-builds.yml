@@ -48,8 +48,10 @@ jobs:
       # Clone this repository
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: true
+
+      - name: Fetch godot-cpp submodule
+        run: |
+          git submodule update --init --recursive --depth 1 godot-cpp
 
       # Setup dependencies
       - name: Setup godot-cpp
