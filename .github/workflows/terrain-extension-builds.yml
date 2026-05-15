@@ -102,7 +102,22 @@ jobs:
           else
             BUILD_TYPE="Debug"
           fi
-          cmake --build build --config $BUILD_TYPE --target ${{ matrix.extension-target }}
+
+          # Determine the MSBuild platform string for Windows runners
+          if [ "${{ matrix.target.platform }}" = "windows" ]; then
+            if [ "${{ matrix.target.arch }}" = "arm64" ]; then
+              PLATFORM_FLAG="-- /p:Platform=ARM64"
+            else
+              PLATFORM_FLAG="-- /p:Platform=x64"
+            fi
+          else
+            PLATFORM_FLAG=""
+          fi
+
+          cmake --build build \
+          --config $BUILD_TYPE \
+          --target ${{ matrix.extension-target }} \
+          $PLATFORM_FLAG
 
       # Upload the build
       - name: Upload Artifact
