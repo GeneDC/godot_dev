@@ -17,10 +17,6 @@ on:
   merge_group:
   workflow_dispatch:
 
-defaults:
-  run: 
-    working-directory: extensions/terrain
-    
 permissions:
   contents: read
 
@@ -46,7 +42,8 @@ jobs:
         target-type: [template_debug]
         #, template_release]
         float-precision: [single]
-        projectdir: [../../project]
+        projectdir: [project]
+        extension-target: [terrain]
 
     runs-on: ${{ matrix.target.os }}
     steps:
@@ -55,7 +52,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Fetch godot-cpp submodule
-        working-directory: ${{ github.workspace }}
         run: |
           git submodule update --init --recursive --depth 1 godot-cpp
 
@@ -106,7 +102,7 @@ jobs:
           else
             BUILD_TYPE="Debug"
           fi
-          cmake --build build --config $BUILD_TYPE
+          cmake --build build --config $BUILD_TYPE --target ${{ matrix.extension-target }}
 
       # Upload the build
       - name: Upload Artifact
