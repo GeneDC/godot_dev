@@ -117,7 +117,7 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v6
         with:
-          name: godot_dev-${{ matrix.target.platform }}-${{ matrix.target.arch }}-${{ matrix.float-precision }}-${{ matrix.target-type }}
+          name: ${{ matrix.extension-target }}-${{ matrix.target.platform }}-${{ matrix.target.arch }}-${{ matrix.float-precision }}-${{ matrix.target-type }}
           path: |
             extensions/${{ matrix.extension-target }}/bin/*.gdextension
             build/bin/${{ matrix.extension-target }}/**/*.dll
