@@ -1,0 +1,28 @@
+name: Build Terrain GDExtension 
+
+on:
+  workflow_call:
+  push:
+    paths:
+      - 'extensions/terrain/**'
+      - '.github/workflows/terrain.yml'
+      - '.github/workflows/extension-build.yml'
+      - '.gitmodules'
+      - 'godot-cpp'
+      - 'CMakeLists.txt'
+  pull_request:
+      paths:
+      - 'extensions/terrain/**'
+      - '.github/workflows/terrain.yml'
+      - '.github/workflows/extension-build.yml'
+      - '.gitmodules'
+      - 'godot-cpp'
+      - 'CMakeLists.txt'
+  merge_group:
+  workflow_dispatch:
+
+jobs:
+  call-compiler:
+    uses: ./.github/workflows/extension-build.yml
+    with:
+      extension-name: terrain

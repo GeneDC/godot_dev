@@ -1,26 +1,14 @@
-name: Build Terrain GDExtension 
+name: Build GDExtension
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
   workflow_call:
-  push:
-    paths:
-      - 'extensions/terrain/**'
-      - '.github/workflows/**'
-      - '.gitmodules'
-      - 'godot-cpp'
-      - 'CMakeLists.txt'
-  pull_request:
-      paths:
-      - 'extensions/terrain/**'
-      - '.github/workflows/**'
-      - '.gitmodules'
-      - 'godot-cpp'
-      - 'CMakeLists.txt'
-  merge_group:
-  workflow_dispatch:
+    inputs:
+      extension-name:
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -48,7 +36,6 @@ jobs:
         #, template_release]
         float-precision: [single]
         projectdir: [project]
-        extension-target: [terrain]
 
     runs-on: ${{ matrix.target.os }}
     steps:
@@ -97,7 +84,6 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=sccache \
             -DGD_ARCH=${{ matrix.target.arch }} \
             -DGD_PRECISION=${{ matrix.float-precision }} \
-            -DGD_PROJECT_DIR=${{ matrix.projectdir }} \
              ${{ matrix.target.flags }}
 
       - name: Build GDExtension via CMake
@@ -111,21 +97,21 @@ jobs:
 
           cmake --build build \
           --config $BUILD_TYPE \
-          --target ${{ matrix.extension-target }} \
+          --target ${{ inputs.extension-name }} \
 
       # Upload the build
       - name: Upload Artifact
         uses: actions/upload-artifact@v6
         with:
-          name: terrain-${{ matrix.target.platform }}-${{ matrix.target.arch }}-${{ matrix.float-precision }}-${{ matrix.target-type }}
+          name: ${{ inputs.extension-name }}-${{ matrix.target.platform }}-${{ matrix.target.arch }}-${{ matrix.float-precision }}-${{ matrix.target-type }}
           path: |
-            extensions/${{ matrix.extension-target }}/bin/*.gdextension
-            build/bin/${{ matrix.extension-target }}/**/*.dll
-            build/bin/${{ matrix.extension-target }}/**/*.so
-            build/bin/${{ matrix.extension-target }}/**/*.dylib
-            build/bin/${{ matrix.extension-target }}/**/*.pdb
+            extensions/${{ inputs.extension-name }}}/bin/*.gdextension
+            build/bin/${{ inputs.extension-name }}/**/*.dll
+            build/bin/${{ inputs.extension-name }}/**/*.so
+            build/bin/${{ inputs.extension-name }}/**/*.dylib
+            build/bin/${{ inputs.extension-name }}/**/*.pdb
 
-  # Merges all the build artifacts together into a single `terrain` artifact.
+  # Merges all the build artifacts together into a single artifact.
   # If you comment out this step, all the builds will be uploaded individually.
   merge:
     runs-on: ubuntu-22.04
@@ -134,6 +120,6 @@ jobs:
       - name: Merge Artifacts
         uses: actions/upload-artifact/merge@v6
         with:
-          name: terrain
-          pattern: terrain-*
+          name: ${{ inputs.extension-name }}
+          pattern: ${{ inputs.extension-name }}-*
           delete-merged: true
