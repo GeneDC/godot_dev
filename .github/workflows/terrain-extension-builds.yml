@@ -8,12 +8,14 @@ on:
       - '.github/workflows/**'
       - '.gitmodules'
       - 'godot-cpp'
+      - 'CMakeLists.txt'
   pull_request:
       paths:
       - 'extensions/terrain/**'
       - '.github/workflows/**'
       - '.gitmodules'
       - 'godot-cpp'
+      - 'CMakeLists.txt'
   merge_group:
   workflow_dispatch:
 
