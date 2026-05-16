@@ -23,17 +23,16 @@ jobs:
         # See https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/running-variations-of-jobs-in-a-workflow
         target:
           [
-            #{ platform: linux, arch: x86_64, os: ubuntu-22.04, flags: "" },
-            #{ platform: linux, arch: arm64, os: ubuntu-22.04-arm, flags: "" },
+            { platform: linux, arch: x86_64, os: ubuntu-22.04, flags: "" },
+            { platform: linux, arch: arm64, os: ubuntu-22.04-arm, flags: "" },
             { platform: windows, arch: x86_64, os: windows-latest, flags: "" },
-            #{ platform: windows, arch: arm64, os: windows-latest, flags: "" },
-            #{ platform: macos, arch: universal, os: macos-latest, flags: '-DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"' },
-            #{ platform: android, arch: x86_64, os: ubuntu-22.04, flags: '-DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_LATEST_HOME/build/cmake/android.toolchain.cmake" -DANDROID_ABI=x86_64 -DANDROID_PLATFORM=android-21' },
-            #{ platform: android, arch: arm64, os: ubuntu-22.04, flags: '-DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_LATEST_HOME/build/cmake/android.toolchain.cmake" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-21' },
-            #{ platform: ios, arch: arm64, os: macos-latest, flags: "-DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64" },
+            { platform: windows, arch: arm64, os: windows-latest, flags: "" },
+            { platform: macos, arch: universal, os: macos-latest, flags: '-DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"' },
+            { platform: android, arch: x86_64, os: ubuntu-22.04, flags: '-DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_LATEST_HOME/build/cmake/android.toolchain.cmake" -DANDROID_ABI=x86_64 -DANDROID_PLATFORM=android-21' },
+            { platform: android, arch: arm64, os: ubuntu-22.04, flags: '-DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_LATEST_HOME/build/cmake/android.toolchain.cmake" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-21' },
+            { platform: ios, arch: arm64, os: macos-latest, flags: "-DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64" },
           ]
-        target-type: [template_debug]
-        #, template_release]
+        target-type: [template_debug, template_release]
         float-precision: [single]
         projectdir: [project]
 
