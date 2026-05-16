@@ -63,9 +63,16 @@ jobs:
           em-version: 3.1.62
 
       # Setup the compiler environment specifically for Windows/MSVC
-      - name: Set up MSVC Developer Command Prompt
+      - name: Setup MSYS2
         if: ${{ matrix.target.platform == 'windows' }}
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64 # Modern 64-bit Windows environment
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
 
       # Build GDExtension (with caches)
 
@@ -76,7 +83,7 @@ jobs:
           variant: sccache # Required for MSVC/Windows compiler caching tracking
 
       - name: Configure CMake
-        shell: bash
+        shell: msys2 {0}
         run: |
           # Map Godot's build types (template, debug, release_debug) to CMake configurations
           if [ "${{ matrix.target-type }}" = "template_release" ]; then
@@ -95,7 +102,7 @@ jobs:
              ${{ matrix.target.flags }}
 
       - name: Build GDExtension via CMake
-        shell: bash
+        shell: msys2 {0}
         run: |
           if [ "${{ matrix.target-type }}" = "template_release" ]; then
             BUILD_TYPE="Release"
