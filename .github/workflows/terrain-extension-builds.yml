@@ -119,7 +119,11 @@ jobs:
         with:
           name: godot_dev-${{ matrix.target.platform }}-${{ matrix.target.arch }}-${{ matrix.float-precision }}-${{ matrix.target-type }}
           path: |
-            ${{ github.workspace }}/extensions/${{ matrix.extension-target }}/bin/**
+            extensions/${{ matrix.extension-target }}/bin/*.gdextension
+            build/bin/${{ matrix.extension-target }}/**/*.dll
+            build/bin/${{ matrix.extension-target }}/**/*.so
+            build/bin/${{ matrix.extension-target }}/**/*.dylib
+            build/bin/${{ matrix.extension-target }}/**/*.pdb
 
   # Merges all the build artifacts together into a single godot_dev artifact.
   # If you comment out this step, all the builds will be uploaded individually.
