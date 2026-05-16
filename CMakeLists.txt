@@ -157,18 +157,9 @@ compatibility_minimum = \"${GD_ENGINE_VERSION}\"
 
 			# Copy the .gdextension file
 			set(GD_EXT_FILE_SRC "${current_ext_path}/bin/${ext_name}.gdextension")
-			set(GD_EXT_FILE_DEST "${GD_PROJECT_DIR}/bin/${ext_name}.gdextension")
-			
 			file(WRITE "${GD_EXT_FILE_SRC}" "${GD_EXT_FILE_CONTENT}")
-
-			message(STATUS "Copying .gdextension for ${ext_name} to project")
-			configure_file("${GD_EXT_FILE_SRC}" "${GD_EXT_FILE_DEST}" COPYONLY)
 			
 			set(GD_EXT_BUILD_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/bin/${ext_name}")
-			set(GD_EXT_DEPLOY_PATH "${GD_PROJECT_DIR}/bin/${ext_name}")
-			
-			# Make deploy directory incase it doesn't exist the copy might fail
-			file(MAKE_DIRECTORY "${GD_EXT_DEPLOY_PATH}/dev_build")
 			
 			# Creates macro GDE_ENTRY_NAME based on the extension name
 			target_compile_definitions(${ext_name} PRIVATE 
@@ -180,11 +171,8 @@ compatibility_minimum = \"${GD_ENGINE_VERSION}\"
 				LIBRARY_OUTPUT_DIRECTORY "${GD_EXT_BUILD_OUTPUT_PATH}"
 				RUNTIME_OUTPUT_DIRECTORY "${GD_EXT_BUILD_OUTPUT_PATH}"
 				# Explicitly set the path for dev_build config
-				RUNTIME_OUTPUT_DIRECTORY_DEV_BUILD "${GD_EXT_BUILD_OUTPUT_PATH}/dev_build" 
+				RUNTIME_OUTPUT_DIRECTORY_DEV_BUILD "${GD_EXT_BUILD_OUTPUT_PATH}/dev_build"
 				PREFIX ""
-				VS_DEBUGGER_COMMAND "${GD_ENGINE_EXE}"
-				VS_DEBUGGER_COMMAND_ARGUMENTS "--editor --path \"${GD_PROJECT_DIR}\""
-				VS_DEBUGGER_WORKING_DIRECTORY "${GD_PROJECT_DIR}"
 			)
 		else()
 			message(WARNING "No source files found for Extension Project: ${ext_name}. No project will be made")
@@ -216,6 +204,23 @@ function(add_godot_project TARGET_NAME EXTRA_ARGS)
 
 	# Extension deployment copy logic
 	foreach(EXTENSION_TARGET IN LISTS PROJECT_EXTENSION_TARGETS)
+	
+		set(GD_EXT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/extensions/${EXTENSION_TARGET}")
+		set(GD_EXT_FILE_SRC "${GD_EXT_DIR}/bin/${EXTENSION_TARGET}.gdextension")
+		set(GD_EXT_FILE_DEST "${GD_PROJECT_DIR}/bin/${EXTENSION_TARGET}.gdextension")
+	
+		# Copy the .gdextension manifest
+		add_custom_command(
+			TARGET ${TARGET_NAME}
+			PRE_BUILD
+			COMMAND ${CMAKE_COMMAND} -E make_directory "${GD_PROJECT_DIR}/bin"
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different
+				"${GD_EXT_FILE_SRC}"
+				"${GD_EXT_FILE_DEST}"
+			COMMENT "Deploying ${EXTENSION_TARGET}.gdextension manifest to ${TARGET_NAME} bin folder..."
+			VERBATIM
+		)
+	
 		# Copy the main binary (.dll / .so / .dylib)
 		add_custom_command(
 			TARGET ${TARGET_NAME}
