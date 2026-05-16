@@ -46,6 +46,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Fetch godot-cpp submodule
+        shell: bash
         run: |
           git submodule update --init --recursive --depth 1 godot-cpp
 
@@ -71,6 +72,7 @@ jobs:
           variant: sccache # Required for MSVC/Windows compiler caching tracking
 
       - name: Configure CMake
+        #shell: uses default
         run: |
           # Map Godot's build types (template, debug, release_debug) to CMake configurations
           if [ "${{ matrix.target-type }}" = "template_release" ]; then
@@ -88,6 +90,7 @@ jobs:
              ${{ matrix.target.flags }}
 
       - name: Build GDExtension via CMake
+        #shell: uses default
         run: |
           if [ "${{ matrix.target-type }}" = "template_release" ]; then
             BUILD_TYPE="Release"
