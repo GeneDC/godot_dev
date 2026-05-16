@@ -57,13 +57,6 @@ jobs:
         run: |
           git submodule update --init --recursive --depth 1 godot-cpp
 
-      # Setup dependencies
-      - name: Setup godot-cpp
-        uses: ./godot-cpp/.github/actions/setup-godot-cpp
-        with:
-          platform: ${{ matrix.target.platform }}
-          em-version: 3.1.62
-
       # Setup the compiler environment specifically for Windows/MSVC
       - name: Setup MSYS2
         if: ${{ matrix.target.platform == 'windows' }}
