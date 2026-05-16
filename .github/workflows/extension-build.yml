@@ -36,6 +36,10 @@ jobs:
         float-precision: [single]
 
     runs-on: ${{ matrix.target.os }}
+    defaults:
+      run:
+        shell: ${{ matrix.target.platform == 'windows' && 'msys2 {0}' || 'bash' }}
+
     steps:
       # Clone this repository
       - name: Checkout
@@ -67,7 +71,6 @@ jobs:
           variant: sccache # Required for MSVC/Windows compiler caching tracking
 
       - name: Configure CMake
-        shell: ${{ matrix.target.platform == 'windows' && 'msys2 {0}' || 'bash' }}
         run: |
           # Map Godot's build types (template, debug, release_debug) to CMake configurations
           if [ "${{ matrix.target-type }}" = "template_release" ]; then
@@ -85,7 +88,6 @@ jobs:
              ${{ matrix.target.flags }}
 
       - name: Build GDExtension via CMake
-        shell: ${{ matrix.target.platform == 'windows' && 'msys2 {0}' || 'bash' }}
         run: |
           if [ "${{ matrix.target-type }}" = "template_release" ]; then
             BUILD_TYPE="Release"
