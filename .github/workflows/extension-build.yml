@@ -63,6 +63,13 @@ jobs:
             mingw-w64-ucrt-x86_64-cmake
             mingw-w64-ucrt-x86_64-ninja
 
+      # Select Xcode version for iOS
+      - name: Setup Xcode Environment (iOS only)
+        if: ${{ matrix.target.platform == 'ios' }}
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcrun --sdk iphoneos --show-sdk-path
+
       # Build GDExtension (with caches)
 
       - name: Setup Cache
