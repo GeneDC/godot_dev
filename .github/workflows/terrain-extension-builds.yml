@@ -117,7 +117,7 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ matrix.extension-target }}-${{ matrix.target.platform }}-${{ matrix.target.arch }}-${{ matrix.float-precision }}-${{ matrix.target-type }}
+          name: terrain-${{ matrix.extension-target }}-${{ matrix.target.platform }}-${{ matrix.target.arch }}-${{ matrix.float-precision }}-${{ matrix.target-type }}
           path: |
             extensions/${{ matrix.extension-target }}/bin/*.gdextension
             build/bin/${{ matrix.extension-target }}/**/*.dll
@@ -125,7 +125,7 @@ jobs:
             build/bin/${{ matrix.extension-target }}/**/*.dylib
             build/bin/${{ matrix.extension-target }}/**/*.pdb
 
-  # Merges all the build artifacts together into a single godot_dev artifact.
+  # Merges all the build artifacts together into a single `terrain` artifact.
   # If you comment out this step, all the builds will be uploaded individually.
   merge:
     runs-on: ubuntu-22.04
@@ -134,6 +134,6 @@ jobs:
       - name: Merge Artifacts
         uses: actions/upload-artifact/merge@v6
         with:
-          name: godot_dev
-          pattern: godot_dev-*
+          name: terrain
+          pattern: terrain-*
           delete-merged: true
