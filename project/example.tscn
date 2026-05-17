@@ -1,8 +1,7 @@
-[gd_scene load_steps=9 format=3 uid="uid://dh0oj81pufivs"]
+[gd_scene load_steps=8 format=3 uid="uid://dh0oj81pufivs"]
 
 [ext_resource type="Script" uid="uid://bi504r0doyid6" path="res://scripts/example.gd" id="1_n51mc"]
 [ext_resource type="Script" uid="uid://c7561n2mnt1m4" path="res://scripts/FreeCamera.gd" id="2_n51mc"]
-[ext_resource type="Script" uid="uid://cm1jnkm23gurv" path="res://scripts/on_screen_stats.gd" id="4_wcwec"]
 [ext_resource type="Script" uid="uid://buu17emdnajmp" path="res://scripts/PlayerCharacter.gd" id="5_ei00m"]
 [ext_resource type="Script" uid="uid://c8ptxv1o1dc6s" path="res://scripts/ChunkViewerAutoRegister.gd" id="6_rujmf"]
 [ext_resource type="Script" uid="uid://bwob5lwa8nf23" path="res://scripts/ViewControl.gd" id="6_ugfer"]
@@ -18,13 +17,6 @@ free_cam_view_control = NodePath("Camera3D/ViewControl")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, -0.3391156, 0.9407447, 0, -0.9407447, -0.3391156, 0.8409251, 52.441833, 0)
-
-[node name="CanvasLayer" type="CanvasLayer" parent="."]
-script = ExtResource("4_wcwec")
-
-[node name="Label" type="Label" parent="CanvasLayer"]
-offset_right = 40.0
-offset_bottom = 23.0
 
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.495, 20, 5.713)

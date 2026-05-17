@@ -1,8 +1,13 @@
-extends CanvasLayer
+class_name DebugInfo extends CanvasLayer
 
 @onready var label: Label = $Label
 
 var monitors: Dictionary[String, Callable] = {}
+
+# Note: Set the CanvasLayer.Layer number high to keep this rendering on top of everything.
+# - Set the Node.Process.Mode to Always so this still works when game is paused.
+func toggle_visibility() -> void:
+	visible = !visible
 
 func _ready() -> void:
 	add_perf_monitor("FPS", func() -> float: return Performance.get_monitor(Performance.TIME_FPS))
@@ -15,7 +20,6 @@ func _ready() -> void:
 	add_perf_monitor("Pending Chunks", func() -> float: return Performance.get_custom_monitor("Terrain/PendingChunks"))
 	add_perf_monitor("Done Mesh Datas", func() -> float: return Performance.get_custom_monitor("Terrain/DoneMeshDatas"))
 
-# TODO: Make this a AutoLoad, and call this from anywhere
 func add_perf_monitor(display_name: String, getter_callable: Callable) -> void:
 	monitors[display_name] = getter_callable
 
@@ -39,10 +43,3 @@ func _process(_delta: float) -> void:
 			display_text += str("Chunk Coord: ", chunk_viewer.get_current_chunk_pos(), "\n")
 	
 	label.text = display_text
-
-func _input(event: InputEvent) -> void:
-	# Toggles visibility when F3 is pressed
-	if (event is InputEventKey):
-		var event_key := event as InputEventKey
-		if (event_key.keycode == KEY_F3 and event_key.pressed):
-			visible = !visible
