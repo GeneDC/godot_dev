@@ -40,6 +40,9 @@ jobs:
       run:
         shell: ${{ matrix.target.platform == 'windows' && 'msys2 {0}' || 'bash' }}
 
+    env:
+      SCCACHE_DIR: ${{ github.workspace }}/.sccache-cache-dir
+
     steps:
       # Clone this repository
       - name: Checkout
@@ -72,11 +75,12 @@ jobs:
 
       # Build GDExtension (with caches)
 
-      - name: Setup Cache
+      - name: Setup Compiler Cache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: ${{ matrix.target.platform }}_${{ matrix.target.arch }}_${{ matrix.float-precision }}_${{ matrix.target-type }}
-          variant: sccache # Required for MSVC/Windows compiler caching tracking
+          key: ${{ inputs.extension-name }}_${{ matrix.target.platform }}_${{ matrix.target.arch }}_${{ matrix.float-precision }}_${{ matrix.target-type }}
+          variant: sccache
+          append-timestamp: false
 
       - name: Configure CMake
         #shell: uses default
