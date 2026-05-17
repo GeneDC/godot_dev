@@ -82,6 +82,12 @@ jobs:
           variant: sccache
           append-timestamp: false
 
+      - name: Ensure Cache Folder Exists for macos
+        shell: bash
+        if: ${{ matrix.target.platform == 'macos' }}
+        run: |
+            mkdir -p "$HOME/Library/Caches/Mozilla.sccache"
+
       - name: Configure CMake
         #shell: uses default
         run: |
