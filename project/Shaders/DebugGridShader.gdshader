@@ -1,10 +1,10 @@
 shader_type spatial;
 render_mode unshaded, blend_mix;
 
-uniform float start_fade_in = 1.5;
-uniform 	float end_fade_in = 2.0;
-uniform 	float start_fade_out = 64.0;
-uniform 	float end_fade_out = 100.0;
+uniform float start_fade_in  = 1.5;
+uniform float end_fade_in    = 2.0;
+uniform float start_fade_out = 20.0;
+uniform float end_fade_out   = 30.0;
 
 varying vec3 v_world_normal;
 
@@ -23,11 +23,12 @@ void fragment() {
 	else if (abs_norm.y > 0.9) color = vec3(0.0, 1.0, 0.0); // Y - Green
 	else if (abs_norm.z > 0.9) color = vec3(0.0, 0.0, 1.0); // Z - Blue
 
-	// Fade in so the it's not harsh
-	float dist = -VERTEX.z; 
+	vec3 world_pos = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	vec3 camera_world_pos = INV_VIEW_MATRIX[3].xyz;
+	float dist = distance(world_pos, camera_world_pos); // spherical distance
 	float fadeIn = smoothstep(start_fade_in, end_fade_in, dist);
 	float fadeOut = 1.0 - smoothstep(start_fade_out, end_fade_out, dist);
-	float alpha = 1.0;//fadeIn * fadeOut; // fading currently not working right
+	float alpha = fadeIn * fadeOut;
 
 	ALBEDO = color;
 	ALPHA = alpha;
