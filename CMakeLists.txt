@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(godot_dev)
 
-set(GD_ENGINE_VERSION "4.5")
+set(GD_ENGINE_VERSION "4.6")
 set(GD_ENGINE_DIR "${CMAKE_SOURCE_DIR}/godot")
 set(GD_ENGINE_EXE "${GD_ENGINE_DIR}/bin/godot.windows.editor.dev.x86_64.exe")
 set(GD_PROJECT_DIR "${CMAKE_SOURCE_DIR}/project")
@@ -32,8 +32,8 @@ set(CMAKE_EXE_LINKER_FLAGS_RELEASE_DEBUG ${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO
 set(CMAKE_SHARED_LINKER_FLAGS_RELEASE_DEBUG ${CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO})
 
 # Set Runtime Library to match the engine build 
-set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>") # Static Linkage (/MT)
-#set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL") # Dynamic Linkage (/MD)
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>") # Static Runtime Lib (/MT)
+#set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL") # Dynamic Runtime Lib (/MD)
 
 if(MSVC)
 	set(ENGINE_VSPROJ "${GD_ENGINE_DIR}/godot.vcxproj")
