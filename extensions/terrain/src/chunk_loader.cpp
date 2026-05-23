@@ -22,9 +22,12 @@
 #include <godot_cpp/core/property_info.hpp>
 #include <godot_cpp/variant/callable.hpp>
 #include <godot_cpp/variant/callable_method_pointer.hpp>
+#include <godot_cpp/variant/char_string.hpp>
+#include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/variant.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
+#include <tracy/Tracy.hpp>
 
 #include <algorithm>
 #include <chunk.h>
@@ -167,6 +170,7 @@ void ChunkLoader::update()
 		PRINT_ERROR("Chunk Loader is not Ready");
 		return;
 	}
+	ZoneScopedN("ChunkLoader::update");
 
 	try_update_chunks();
 
@@ -175,9 +179,15 @@ void ChunkLoader::update()
 	constexpr uint64_t time_budget = 4000;
 
 	{ // move the done meshes to our array so we can take time applying them
+		ZoneNamedN(zoneTakeDoneMeshData, "Take Done Mesh Data", true);
+
 		std::vector<MeshData> done_mesh_datas = mesh_generator_pool->take_results();
 
-		// TODO: only queue close chunks, use something the Chunk Viewer to manage this
+		String info_text = "Mesh Data Count: " + String::num_int64(done_mesh_datas.size());
+		CharString utf8_text = info_text.utf8();
+		ZoneText(utf8_text.get_data(), utf8_text.length());
+
+		// TODO: only queue close chunks, use the Chunk Viewer to manage this
 		Vector3 centre_pos = chunk_viewer->get_current_chunk_pos();
 		float collision_radius_sqr = 2 * 2;
 		for (const MeshData& mesh_data : done_mesh_datas)
@@ -211,26 +221,37 @@ void ChunkLoader::update()
 			}
 		}
 	}
-
-	while (!mesh_datas.empty())
 	{
-		if (Time::get_singleton()->get_ticks_usec() - start_time > time_budget)
+		ZoneNamedN(zoneUpdateChunkMesh, "Update Chunk Mesh", true);
+
+		while (!mesh_datas.empty())
 		{
-			break;
+			if (Time::get_singleton()->get_ticks_usec() - start_time > time_budget)
+			{
+				break;
+			}
+
+			MeshData mesh_data = mesh_datas.back();
+			mesh_datas.pop_back();
+
+			Chunk* chunk = get_chunk(mesh_data.chunk_pos);
+			chunk->update_chunk_mesh(mesh_data);
 		}
-
-		MeshData mesh_data = mesh_datas.back();
-		mesh_datas.pop_back();
-
-		Chunk* chunk = get_chunk(mesh_data.chunk_pos);
-		chunk->update_chunk_mesh(mesh_data);
 	}
-
-	std::vector<CollisionData> collision_datas = collision_generator_pool->take_results();
-	for (CollisionData& collision_data : collision_datas)
 	{
-		Chunk* chunk = get_chunk(collision_data.chunk_pos);
-		chunk->update_chunk_collision(collision_data);
+		ZoneNamedN(zoneUpdateChunkCollision, "Update Chunk Collision", true);
+
+		std::vector<CollisionData> collision_datas = collision_generator_pool->take_results();
+
+		String info_text = "Collision Data Count: " + String::num_int64(collision_datas.size());
+		CharString utf8_text = info_text.utf8();
+		ZoneText(utf8_text.get_data(), utf8_text.length());
+
+		for (CollisionData& collision_data : collision_datas)
+		{
+			Chunk* chunk = get_chunk(collision_data.chunk_pos);
+			chunk->update_chunk_collision(collision_data);
+		}
 	}
 }
 
@@ -253,6 +274,8 @@ void ChunkLoader::stop()
 
 void ChunkLoader::try_update_chunks()
 {
+	ZoneScopedN("ChunkLoader::try_update_chunks");
+
 	if (mesh_generator_pool->get_task_count() > 1024)
 	{
 		// Don't queue chunks if the mesh_generator has enough work

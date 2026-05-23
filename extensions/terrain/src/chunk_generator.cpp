@@ -15,6 +15,7 @@
 #include <godot_cpp/variant/vector2i.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
+#include <tracy/Tracy.hpp>
 
 #include <cstdint>
 #include <iterator>
@@ -45,6 +46,8 @@ void ChunkGeneratorSettings::_bind_methods()
 ChunkData* ChunkGenerator::process_task(ChunkData* chunk_data)
 {
 	// NOTE: this currently generates a chunk size + 1 array, but a chunk only needs the chunk size data and the extra data can be added before it's sent to the shader
+
+	ZoneScopedN("Generate Chunk Data");
 
 	chunk_data->surface_sum = 0;
 
@@ -104,6 +107,8 @@ thread_local std::list<ChunkGenerator::HeightMap> ChunkGenerator::tl_height_map_
 
 bool ChunkGenerator::generate_height_map(const Vector3& p_chunk_world_pos) const
 {
+	ZoneScopedN("Generate Chunk Height Map");
+
 	if (!settings->height_base_noise.is_valid())
 	{
 		print_error("height_base_noise is invalid");

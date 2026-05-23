@@ -1,0 +1,2 @@
+# Set to ON/OFF to enable/disable Tracy Profiler
+ENABLE_TRACY=ON

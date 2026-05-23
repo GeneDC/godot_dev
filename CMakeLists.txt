@@ -1,11 +1,14 @@
 cmake_minimum_required(VERSION 3.20)
 project(godot_dev)
 
+option(ENABLE_TRACY "Enable Tracy Profiler hooks" OFF)
+
 set(GD_ENGINE_VERSION "4.6")
 set(GD_ENGINE_DIR "${CMAKE_SOURCE_DIR}/godot")
 set(GD_ENGINE_EXE "${GD_ENGINE_DIR}/bin/godot.windows.editor.dev.x86_64.exe")
 set(GD_PROJECT_DIR "${CMAKE_SOURCE_DIR}/project")
 set(GD_CPP_DIR "${CMAKE_SOURCE_DIR}/godot-cpp")
+set(TRACY_DIR "${CMAKE_SOURCE_DIR}/thirdparty/tracy")
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_EXTENSIONS ON)
@@ -125,6 +128,24 @@ foreach(dir ${extension_dirs})
 			# Tell VS to mirror the actual folder structure on disk
 			source_group(TREE "${current_ext_path}" FILES ${SOURCES})
 
+			# Always include tracy header files so that the include, and macros build.
+			target_include_directories(${ext_name} PRIVATE "${TRACY_DIR}/public")
+
+			if(ENABLE_TRACY)
+				message(STATUS "Tracy Profiling enabled for ${ext_name}")
+				
+				target_compile_definitions(${ext_name} PRIVATE
+					TRACY_ENABLE
+				)
+				
+				target_sources(${ext_name} PRIVATE "${TRACY_DIR}/public/TracyClient.cpp")
+				
+				# Link Windows Socket and Debug Help libraries required by the Tracy Client
+				if(WIN32)
+					target_link_libraries(${ext_name} PRIVATE ws2_32 dbghelp)
+				endif()
+			endif()
+
 			# Build settings
 			target_link_libraries(${ext_name} PRIVATE godot-cpp)
 			target_include_directories(${ext_name} PRIVATE ${current_ext_src})
@@ -212,7 +233,7 @@ function(add_godot_project TARGET_NAME EXTRA_ARGS)
 		# Copy the .gdextension manifest
 		add_custom_command(
 			TARGET ${TARGET_NAME}
-			PRE_BUILD
+			POST_BUILD
 			COMMAND ${CMAKE_COMMAND} -E make_directory "${GD_PROJECT_DIR}/bin"
 			COMMAND ${CMAKE_COMMAND} -E copy_if_different
 				"${GD_EXT_FILE_SRC}"
@@ -224,7 +245,7 @@ function(add_godot_project TARGET_NAME EXTRA_ARGS)
 		# Copy the main binary (.dll / .so / .dylib)
 		add_custom_command(
 			TARGET ${TARGET_NAME}
-			PRE_BUILD
+			POST_BUILD
 			COMMAND ${CMAKE_COMMAND} -E make_directory "${GD_PROJECT_DIR}/bin"
 			COMMAND ${CMAKE_COMMAND} -E copy_if_different
 				"$<TARGET_FILE:${EXTENSION_TARGET}>"
@@ -237,7 +258,7 @@ function(add_godot_project TARGET_NAME EXTRA_ARGS)
 		if(MSVC)
 			add_custom_command(
 				TARGET ${TARGET_NAME}
-				PRE_BUILD
+				POST_BUILD
 				COMMAND ${CMAKE_COMMAND} -E copy_if_different
 					"$<TARGET_FILE_DIR:${EXTENSION_TARGET}>/$<TARGET_FILE_BASE_NAME:${EXTENSION_TARGET}>.pdb"
 					"${GD_PROJECT_DIR}/bin/${EXTENSION_TARGET}/dev_build/$<TARGET_FILE_BASE_NAME:${EXTENSION_TARGET}>.pdb"
