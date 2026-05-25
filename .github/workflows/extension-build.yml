@@ -52,6 +52,11 @@ jobs:
         shell: bash
         run: |
           git submodule update --init --recursive --depth 1 godot-cpp
+          
+      - name: Fetch tracy submodule
+        shell: bash
+        run: |
+          git submodule update --init --recursive --depth 1 thirdparty/tracy
 
       # Setup the compiler environment specifically for Windows/MSVC
       - name: Setup MSYS2
