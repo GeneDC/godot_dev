@@ -11,6 +11,10 @@ if exist "build\bin" (
 	echo - Deleting: "build\bin"
 	rd /s /q "build\bin"
 )
+if exist "build_tracy\bin" (
+	echo - Deleting: "build_tracy\bin"
+	rd /s /q "build_tracy\bin"
+)
 
 echo [3/5] Clean deployed binaries in the Godot project
 if exist "project\bin" (

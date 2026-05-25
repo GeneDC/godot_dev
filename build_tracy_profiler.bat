@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-echo === Tracy Project Setup ===
+echo === Tracy Build ===
 
 cd thirdparty/tracy
 

@@ -2,10 +2,11 @@ cmake_minimum_required(VERSION 3.20)
 project(godot_dev)
 
 option(ENABLE_TRACY "Enable Tracy Profiler hooks" OFF)
+set(ENGINE_BIN_DIR "bin" CACHE STRING "Engine bin directory")
 
 set(GD_ENGINE_VERSION "4.6")
 set(GD_ENGINE_DIR "${CMAKE_SOURCE_DIR}/godot")
-set(GD_ENGINE_EXE "${GD_ENGINE_DIR}/bin/godot.windows.editor.dev.x86_64.exe")
+set(GD_ENGINE_EXE "${GD_ENGINE_DIR}/${ENGINE_BIN_DIR}/godot.windows.editor.dev.x86_64.exe")
 set(GD_PROJECT_DIR "${CMAKE_SOURCE_DIR}/project")
 set(GD_CPP_DIR "${CMAKE_SOURCE_DIR}/godot-cpp")
 set(TRACY_DIR "${CMAKE_SOURCE_DIR}/thirdparty/tracy")
@@ -202,7 +203,7 @@ compatibility_minimum = \"${GD_ENGINE_VERSION}\"
 endforeach()
 
 function(add_godot_project TARGET_NAME EXTRA_ARGS)
-	message(STATUS "Creating project for Godot project")
+	message(STATUS "Creating Godot project target: ${TARGET_NAME}")
 
 	# Collect all Godot project files for visibility in VS
 	file(GLOB_RECURSE GODOT_FILES 
