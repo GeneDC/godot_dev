@@ -231,41 +231,46 @@ function(add_godot_project TARGET_NAME EXTRA_ARGS)
 		set(GD_EXT_FILE_SRC "${GD_EXT_DIR}/bin/${EXTENSION_TARGET}.gdextension")
 		set(GD_EXT_FILE_DEST "${GD_PROJECT_DIR}/bin/${EXTENSION_TARGET}.gdextension")
 	
-		# Copy the .gdextension manifest
+		# Calculate native filenames
+		if(WIN32)
+			set(PLATFORM_LIB_NAME "${EXTENSION_TARGET}.dll")
+			set(PLATFORM_PDB_NAME "${EXTENSION_TARGET}.pdb")
+		elseif(APPLE)
+			set(PLATFORM_LIB_NAME "lib${EXTENSION_TARGET}.dylib")
+		else() # Linux / BSD / Unix
+			set(PLATFORM_LIB_NAME "lib${EXTENSION_TARGET}.so")
+		endif()
+
+		set(DEPLOYED_BINARY "${GD_PROJECT_DIR}/bin/${EXTENSION_TARGET}/dev_build/${PLATFORM_LIB_NAME}")
+		set(DEPLOYED_PDB "${GD_PROJECT_DIR}/bin/${EXTENSION_TARGET}/dev_build/${PLATFORM_PDB_NAME}")
+
+		# Copy the PDB symbols (Windows only)
+		set(PDB_COPY_STEP "")
+		if(MSVC)
+			set(PDB_COPY_STEP
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different
+					"$<TARGET_FILE_DIR:${EXTENSION_TARGET}>/${PLATFORM_PDB_NAME}"
+					"${DEPLOYED_PDB}"
+			)
+		endif()
+
 		add_custom_command(
-			TARGET ${TARGET_NAME}
-			POST_BUILD
+			OUTPUT "${DEPLOYED_BINARY}"
+			DEPENDS ${EXTENSION_TARGET} "$<TARGET_FILE:${EXTENSION_TARGET}>"
 			COMMAND ${CMAKE_COMMAND} -E make_directory "${GD_PROJECT_DIR}/bin"
 			COMMAND ${CMAKE_COMMAND} -E copy_if_different
 				"${GD_EXT_FILE_SRC}"
 				"${GD_EXT_FILE_DEST}"
-			COMMENT "Deploying ${EXTENSION_TARGET}.gdextension manifest to ${TARGET_NAME} bin folder..."
-			VERBATIM
-		)
-	
-		# Copy the main binary (.dll / .so / .dylib)
-		add_custom_command(
-			TARGET ${TARGET_NAME}
-			POST_BUILD
-			COMMAND ${CMAKE_COMMAND} -E make_directory "${GD_PROJECT_DIR}/bin"
 			COMMAND ${CMAKE_COMMAND} -E copy_if_different
 				"$<TARGET_FILE:${EXTENSION_TARGET}>"
-				"${GD_PROJECT_DIR}/bin/${EXTENSION_TARGET}/dev_build/$<TARGET_FILE_NAME:${EXTENSION_TARGET}>"
+				"${DEPLOYED_BINARY}"
+			${PDB_COPY_STEP}
 			COMMENT "Deploying ${EXTENSION_TARGET} binary directly to ${TARGET_NAME} project bin folder..."
 			VERBATIM
 		)
 		
-		# Copy the PDB symbols (Windows only)
-		if(MSVC)
-			add_custom_command(
-				TARGET ${TARGET_NAME}
-				POST_BUILD
-				COMMAND ${CMAKE_COMMAND} -E copy_if_different
-					"$<TARGET_FILE_DIR:${EXTENSION_TARGET}>/$<TARGET_FILE_BASE_NAME:${EXTENSION_TARGET}>.pdb"
-					"${GD_PROJECT_DIR}/bin/${EXTENSION_TARGET}/dev_build/$<TARGET_FILE_BASE_NAME:${EXTENSION_TARGET}>.pdb"
-				VERBATIM
-			)
-		endif()
+		# Set target source to prevent VS's Fast Up-To-Date from skipping the target
+		target_sources(${TARGET_NAME} PRIVATE "${DEPLOYED_BINARY}")
 	endforeach()
 
 	# Add extention dependencies. 
