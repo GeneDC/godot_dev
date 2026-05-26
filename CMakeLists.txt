@@ -181,7 +181,7 @@ compatibility_minimum = \"${GD_ENGINE_VERSION}\"
 			set(GD_EXT_FILE_SRC "${current_ext_path}/bin/${ext_name}.gdextension")
 			file(WRITE "${GD_EXT_FILE_SRC}" "${GD_EXT_FILE_CONTENT}")
 			
-			set(GD_EXT_BUILD_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/bin/${ext_name}")
+			set(GD_EXT_BUILD_OUTPUT_PATH "${CMAKE_BINARY_DIR}/bin/${ext_name}")
 			
 			# Creates macro GDE_ENTRY_NAME based on the extension name
 			target_compile_definitions(${ext_name} PRIVATE 
