@@ -29,15 +29,17 @@ MeshGenerator::~MeshGenerator()
 {
 	if (local_rendering_device)
 	{
+		// Free the pipeline and uniform set before the shader to prevent double free
+		if (pipeline.is_valid()) local_rendering_device->free_rid(pipeline);
+		if (uniform_set.is_valid()) local_rendering_device->free_rid(uniform_set);
 		if (shader.is_valid()) local_rendering_device->free_rid(shader);
+
 		if (points_buffer.is_valid()) local_rendering_device->free_rid(points_buffer);
 		if (points_sampler_rid.is_valid()) local_rendering_device->free_rid(points_sampler_rid);
 		if (vertex_buffer.is_valid()) local_rendering_device->free_rid(vertex_buffer);
 		if (normal_buffer.is_valid()) local_rendering_device->free_rid(normal_buffer);
 		if (colour_buffer.is_valid()) local_rendering_device->free_rid(colour_buffer);
 		if (count_buffer.is_valid()) local_rendering_device->free_rid(count_buffer);
-		if (uniform_set.is_valid()) local_rendering_device->free_rid(uniform_set);
-		if (pipeline.is_valid()) local_rendering_device->free_rid(pipeline);
 
 		memdelete(local_rendering_device);
 		local_rendering_device = nullptr;
