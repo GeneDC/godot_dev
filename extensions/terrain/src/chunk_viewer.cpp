@@ -18,17 +18,16 @@ void ChunkViewer::_bind_methods()
 
 std::vector<Vector3i> ChunkViewer::get_chunk_positions(int64_t max_count)
 {
-	std::shared_lock lock(mutex); // Read lock
+	std::unique_lock lock(mutex); // Write lock as we change current_shell and current_index
 
 	ShellRange range = CHUNK_SHELL_RANGES[current_shell];
 
 	std::vector<Vector3i> results{};
 	results.reserve(max_count);
 
-	int64_t count = 0;
 	while (results.size() < max_count)
 	{
-		if (range.start + count >= range.end)
+		if (range.start + current_index >= range.end)
 		{
 			if (current_shell >= CHUNK_SHELL_RANGE_COUNT - 1)
 			{
@@ -36,15 +35,15 @@ std::vector<Vector3i> ChunkViewer::get_chunk_positions(int64_t max_count)
 			}
 
 			current_shell++;
-			count = 0;
+			current_index = 0;
 			range = CHUNK_SHELL_RANGES[current_shell];
 		}
-		Vector3i position = last_chunk_pos + CHUNK_LUT[range.start + count];
+		Vector3i position = last_chunk_pos + CHUNK_LUT[range.start + current_index];
 		if (!chunk_map->has_chunk(position))
 		{
 			results.push_back(position);
 		}
-		count++;
+		current_index++;
 	}
 
 	return results; // Target index should equal the count
