@@ -83,6 +83,7 @@ private:
 
 	HashMap<Vector3i, Chunk*> chunk_node_map{};
 	std::vector<MeshData> mesh_datas{};
+	std::vector<CollisionData> collision_datas{};
 
 	using ChunkGeneratorPool = ThreadPool<ChunkGenerator, ChunkData*, ChunkData*>;
 	Ref<ChunkGeneratorPool> chunk_generator_pool;

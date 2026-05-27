@@ -1,15 +1,14 @@
 #pragma once
 
-#include "mesh_generator.h"
-
-#include <godot_cpp/classes/collision_shape3d.hpp>
 #include <godot_cpp/classes/mesh_instance3d.hpp>
 #include <godot_cpp/classes/node3d.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/standard_material3d.hpp>
-#include <godot_cpp/classes/static_body3d.hpp>
 #include <godot_cpp/classes/wrapped.hpp>
-#include <collision_generator.h>
+#include <godot_cpp/variant/rid.hpp>
+
+struct MeshData;
+struct CollisionData;
 
 using namespace godot;
 
@@ -19,6 +18,7 @@ class Chunk : public Node3D
 
 public:
 	Chunk();
+	~Chunk();
 	virtual void _ready() override;
 	void update_chunk_mesh(const MeshData& p_mesh_data);
 	void update_chunk_collision(const CollisionData& p_collision_data);
@@ -29,6 +29,6 @@ protected:
 
 private:
 	MeshInstance3D* mesh_instance;
-	StaticBody3D* static_body;
-	CollisionShape3D* collision_shape;
+	RID physics_body_rid{};
+	RID collision_shape_rid{};
 };

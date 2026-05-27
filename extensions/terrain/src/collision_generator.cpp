@@ -6,13 +6,19 @@
 #include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/concave_polygon_shape3d.hpp>
 #include <godot_cpp/classes/mesh.hpp>
+#include <godot_cpp/classes/physics_server3d.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/triangle_mesh.hpp>
 #include <godot_cpp/variant/array.hpp>
+#include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_vector3_array.hpp>
+#include <godot_cpp/variant/rid.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
+#include <godot_cpp/variant/variant.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -20,20 +26,32 @@
 using namespace godot;
 using namespace terrain_constants;
 
+static PackedVector3Array optimise_mesh_to_faces(const PackedVector3Array& verts);
+
 CollisionData CollisionGenerator::process_task(MeshData p_mesh_data)
 {
-	CollisionData result{};
+	CollisionData result{ p_mesh_data.chunk_pos, RID() };
 
-	result.chunk_pos = p_mesh_data.chunk_pos;
-
-	result.collision_shape.instantiate();
-	result.collision_shape->set_backface_collision_enabled(false);
-
-	if (p_mesh_data.array_mesh.is_valid())
+	if (!p_mesh_data.array_mesh.is_valid())
 	{
-		PackedVector3Array faces = p_mesh_data.array_mesh->generate_triangle_mesh()->get_faces();
-		Ref<ArrayMesh> array_mesh = optimise_mesh(faces);
-		result.collision_shape = array_mesh->create_trimesh_shape();
+		return result;
+	}
+
+	PackedVector3Array raw_faces = p_mesh_data.array_mesh->generate_triangle_mesh()->get_faces();
+	PackedVector3Array optimized_faces = optimise_mesh_to_faces(raw_faces);
+	if (optimized_faces.size() > 0)
+	{
+		PhysicsServer3D* physics_server = PhysicsServer3D::get_singleton();
+		RID new_shape_rid = physics_server->concave_polygon_shape_create();
+
+		Dictionary shape_data{};
+		shape_data["faces"] = Variant(optimized_faces);
+		shape_data["backface_collision"] = Variant(false);
+
+		Variant shape_data_as_variant = shape_data;
+		physics_server->shape_set_data(new_shape_rid, shape_data_as_variant);
+
+		result.shape_rid = new_shape_rid;
 	}
 
 	return result;
@@ -41,53 +59,94 @@ CollisionData CollisionGenerator::process_task(MeshData p_mesh_data)
 
 static thread_local std::array<int32_t, 3 * POINTS_VOLUME> edge_to_index;
 
-Ref<ArrayMesh> CollisionGenerator::optimise_mesh(const PackedVector3Array& verts)
+static PackedVector3Array optimise_mesh_to_faces(const PackedVector3Array& verts)
 {
+	const int64_t vert_count = verts.size();
+	if (vert_count == 0)
+	{
+		return PackedVector3Array();
+	}
+
 	edge_to_index.fill(-1);
 
-	PackedVector3Array vertices;
+	PackedVector3Array unique_vertices;
 	PackedInt32Array indices;
 
-	const int64_t vert_count = verts.size();
-	const Vector3* verts_ptr = verts.ptr();
+	// Roughly pre-allocate to avoid excessive heap re-allocations
+	unique_vertices.resize(vert_count / 3);
+	indices.resize(vert_count);
 
-	for (int i = 0; i < vert_count; ++i)
+	const Vector3* verts_ptr = verts.ptr();
+	Vector3* write_verts_ptr = unique_vertices.ptrw();
+	int32_t* write_indices_ptr = indices.ptrw();
+
+	int32_t unique_vert_counter = 0;
+
+	for (int64_t i = 0; i < vert_count; ++i)
 	{
 		const Vector3& vert = verts_ptr[i];
 
-		// Determine which axis the vertex is on by checking which component is fractional
+		// Threshold checks and clamp values to avoid going out-of-bounds on edge_to_index.
+		float fx = std::floor(vert.x);
+		float fy = std::floor(vert.y);
+		float fz = std::floor(vert.z);
+
 		uint64_t axis = 0;
-		if (vert.y > std::floor(vert.y) + 0.001f)
+		if ((vert.y - fy) > 0.001f)
+		{
 			axis = 1;
-		else if (vert.z > std::floor(vert.z) + 0.001f)
+		}
+		else if ((vert.z - fz) > 0.001f)
+		{
 			axis = 2;
+		}
 
-		uint64_t x = static_cast<uint64_t>(std::floor(vert.x));
-		uint64_t y = static_cast<uint64_t>(std::floor(vert.y));
-		uint64_t z = static_cast<uint64_t>(std::floor(vert.z));
+		uint64_t x = std::clamp(static_cast<uint64_t>(fx), 0ULL, static_cast<uint64_t>(POINTS_SIZE - 1));
+		uint64_t y = std::clamp(static_cast<uint64_t>(fy), 0ULL, static_cast<uint64_t>(POINTS_SIZE - 1));
+		uint64_t z = std::clamp(static_cast<uint64_t>(fz), 0ULL, static_cast<uint64_t>(POINTS_SIZE - 1));
 
-		int edge_id = (axis * POINTS_VOLUME) + (z * POINTS_AREA) + (y * POINTS_SIZE) + x;
+		uint64_t edge_id = (axis * POINTS_VOLUME) + (z * POINTS_AREA) + (y * POINTS_SIZE) + x;
+
+		if (edge_id >= edge_to_index.size())
+		{
+			edge_id = edge_to_index.size() - 1;
+		}
+
 		if (edge_to_index[edge_id] == -1)
 		{
-			int32_t new_idx = vertices.size();
-			vertices.push_back(vert);
-			edge_to_index[edge_id] = new_idx;
-			indices.push_back(new_idx);
+			// Resize if needed
+			if (unique_vert_counter >= unique_vertices.size())
+			{
+				unique_vertices.resize(unique_vertices.size() * 2);
+				write_verts_ptr = unique_vertices.ptrw();
+			}
+
+			write_verts_ptr[unique_vert_counter] = vert;
+			edge_to_index[edge_id] = unique_vert_counter;
+			write_indices_ptr[i] = unique_vert_counter;
+
+			unique_vert_counter++;
 		}
 		else
 		{
-			indices.push_back(edge_to_index[edge_id]);
+			write_indices_ptr[i] = edge_to_index[edge_id];
 		}
 	}
 
-	Array arrays;
-	arrays.resize(Mesh::ARRAY_MAX);
-	arrays[Mesh::ARRAY_VERTEX] = vertices;
-	arrays[Mesh::ARRAY_INDEX] = indices;
+	// Make sure the vertices size matches the actual vert count
+	unique_vertices.resize(unique_vert_counter);
 
-	Ref<ArrayMesh> mesh;
-	mesh.instantiate();
-	mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
+	PackedVector3Array optimized_faces;
+	optimized_faces.resize(vert_count);
+	Vector3* write_faces_ptr = optimized_faces.ptrw();
 
-	return mesh;
+	const Vector3* final_verts_ptr = unique_vertices.ptr();
+	const int32_t* final_indices_ptr = indices.ptr();
+
+	for (int64_t i = 0; i < vert_count; ++i)
+	{
+		write_faces_ptr[i] = final_verts_ptr[final_indices_ptr[i]];
+	}
+
+	return optimized_faces;
 }

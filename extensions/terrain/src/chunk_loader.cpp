@@ -176,10 +176,10 @@ void ChunkLoader::update()
 
 	uint64_t start_time = Time::get_singleton()->get_ticks_usec();
 	// budget in microseconds: 2000us = 2ms
-	constexpr uint64_t time_budget = 4000;
+	constexpr uint64_t mesh_time_budget = 4000;
 
 	{ // move the done meshes to our array so we can take time applying them
-		ZoneNamedN(zoneTakeDoneMeshData, "Take Done Mesh Data", true);
+		ZoneNamedN(zoneTakeDoneMeshData, "Take and Sort Mesh Data", true);
 
 		std::vector<MeshData> done_mesh_datas = mesh_generator_pool->take_results();
 
@@ -215,7 +215,7 @@ void ChunkLoader::update()
 					[centre_pos](const auto& a, const auto& b)
 					{ return centre_pos.distance_squared_to(a.chunk_pos) < centre_pos.distance_squared_to(b.chunk_pos); });
 
-			if (Time::get_singleton()->get_ticks_usec() - start_time > time_budget)
+			if (Time::get_singleton()->get_ticks_usec() - start_time > mesh_time_budget)
 			{
 				PRINT_ERROR("sorting %d mesh data took too long!", static_cast<uint64_t>(mesh_datas.size()));
 			}
@@ -226,7 +226,7 @@ void ChunkLoader::update()
 
 		while (!mesh_datas.empty())
 		{
-			if (Time::get_singleton()->get_ticks_usec() - start_time > time_budget)
+			if (Time::get_singleton()->get_ticks_usec() - start_time > mesh_time_budget)
 			{
 				break;
 			}
@@ -238,17 +238,58 @@ void ChunkLoader::update()
 			chunk->update_chunk_mesh(mesh_data);
 		}
 	}
+
+	start_time = Time::get_singleton()->get_ticks_usec();
+	constexpr uint64_t collision_time_budget = 2000;
 	{
-		ZoneNamedN(zoneUpdateChunkCollision, "Update Chunk Collision", true);
+		ZoneNamedN(zoneSortCollisionData, "Take and Sort Collision Data", true);
 
-		std::vector<CollisionData> collision_datas = collision_generator_pool->take_results();
+		std::vector<CollisionData> done_collision_datas = collision_generator_pool->take_results();
 
-		String info_text = "Collision Data Count: " + String::num_int64(collision_datas.size());
+		String info_text = "Done Collision Data Count: " + String::num_int64(done_collision_datas.size());
 		CharString utf8_text = info_text.utf8();
 		ZoneText(utf8_text.get_data(), utf8_text.length());
 
-		for (CollisionData& collision_data : collision_datas)
+		if (!done_collision_datas.empty())
 		{
+			collision_datas.insert(
+					collision_datas.end(),
+					std::make_move_iterator(done_collision_datas.begin()),
+					std::make_move_iterator(done_collision_datas.end()));
+
+			Vector3 centre_pos = chunk_viewer->get_current_chunk_pos();
+			uint64_t count = std::min<uint64_t>(collision_datas.size(), 10); // It's unlikely we'll process more than 10, so only sort that many
+			// Sort x closest positions to the back, using reverse iterators
+			std::ranges::partial_sort(
+					collision_datas.rbegin(),
+					collision_datas.rbegin() + count,
+					collision_datas.rend(),
+					[centre_pos](const auto& a, const auto& b)
+					{ return centre_pos.distance_squared_to(a.chunk_pos) < centre_pos.distance_squared_to(b.chunk_pos); });
+
+			if (Time::get_singleton()->get_ticks_usec() - start_time > collision_time_budget)
+			{
+				PRINT_ERROR("sorting %d collision data took too long!", static_cast<uint64_t>(collision_datas.size()));
+			}
+		}
+	}
+	{
+		ZoneNamedN(zoneUpdateChunkCollision, "Update Chunk Collisions", true);
+
+		String info_text = "Pending Collision Data Count: " + String::num_int64(collision_datas.size());
+		CharString utf8_text = info_text.utf8();
+		ZoneText(utf8_text.get_data(), utf8_text.length());
+
+		while (!collision_datas.empty())
+		{
+			if (Time::get_singleton()->get_ticks_usec() - start_time > collision_time_budget)
+			{
+				break;
+			}
+
+			CollisionData collision_data = collision_datas.back();
+			collision_datas.pop_back();
+
 			Chunk* chunk = get_chunk(collision_data.chunk_pos);
 			chunk->update_chunk_collision(collision_data);
 		}

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "abstract_task_processer.h"
-#include "mesh_generator.h"
 
 #include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/concave_polygon_shape3d.hpp>
@@ -10,14 +9,17 @@
 #include <godot_cpp/classes/wrapped.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/variant/packed_vector3_array.hpp>
+#include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
+
+struct MeshData;
 
 using namespace godot;
 
 struct CollisionData
 {
 	Vector3i chunk_pos{};
-	Ref<ConcavePolygonShape3D> collision_shape;
+	RID shape_rid{};
 };
 
 class CollisionGenerator final : public ITaskProcessor<MeshData, CollisionData>
