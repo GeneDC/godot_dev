@@ -96,9 +96,9 @@ static PackedVector3Array optimise_mesh_to_faces(const PackedVector3Array& verts
 			axis = 2;
 		}
 
-		uint64_t x = Math::clamp(static_cast<uint64_t>(fx), 0ULL, static_cast<uint64_t>(POINTS_SIZE - 1));
-		uint64_t y = Math::clamp(static_cast<uint64_t>(fy), 0ULL, static_cast<uint64_t>(POINTS_SIZE - 1));
-		uint64_t z = Math::clamp(static_cast<uint64_t>(fz), 0ULL, static_cast<uint64_t>(POINTS_SIZE - 1));
+		uint64_t x = Math::clamp(static_cast<uint64_t>(fx), UINT64_C(0), static_cast<uint64_t>(POINTS_SIZE - 1));
+		uint64_t y = Math::clamp(static_cast<uint64_t>(fy), UINT64_C(0), static_cast<uint64_t>(POINTS_SIZE - 1));
+		uint64_t z = Math::clamp(static_cast<uint64_t>(fz), UINT64_C(0), static_cast<uint64_t>(POINTS_SIZE - 1));
 
 		uint64_t edge_id = (axis * POINTS_VOLUME) + (z * POINTS_AREA) + (y * POINTS_SIZE) + x;
 
