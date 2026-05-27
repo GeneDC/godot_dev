@@ -3,24 +3,19 @@
 #include "mesh_generator.h"
 #include "terrain_constants.h"
 
-#include <godot_cpp/classes/array_mesh.hpp>
-#include <godot_cpp/classes/concave_polygon_shape3d.hpp>
 #include <godot_cpp/classes/mesh.hpp>
 #include <godot_cpp/classes/physics_server3d.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/triangle_mesh.hpp>
-#include <godot_cpp/variant/array.hpp>
+#include <godot_cpp/core/math.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_vector3_array.hpp>
 #include <godot_cpp/variant/rid.hpp>
-#include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/variant/variant.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
-#include <algorithm>
 #include <array>
-#include <cmath>
 #include <cstdint>
 
 using namespace godot;
@@ -87,9 +82,9 @@ static PackedVector3Array optimise_mesh_to_faces(const PackedVector3Array& verts
 		const Vector3& vert = verts_ptr[i];
 
 		// Threshold checks and clamp values to avoid going out-of-bounds on edge_to_index.
-		float fx = std::floor(vert.x);
-		float fy = std::floor(vert.y);
-		float fz = std::floor(vert.z);
+		float fx = Math::floor(vert.x);
+		float fy = Math::floor(vert.y);
+		float fz = Math::floor(vert.z);
 
 		uint64_t axis = 0;
 		if ((vert.y - fy) > 0.001f)
@@ -101,9 +96,9 @@ static PackedVector3Array optimise_mesh_to_faces(const PackedVector3Array& verts
 			axis = 2;
 		}
 
-		uint64_t x = std::clamp(static_cast<uint64_t>(fx), 0ULL, static_cast<uint64_t>(POINTS_SIZE - 1));
-		uint64_t y = std::clamp(static_cast<uint64_t>(fy), 0ULL, static_cast<uint64_t>(POINTS_SIZE - 1));
-		uint64_t z = std::clamp(static_cast<uint64_t>(fz), 0ULL, static_cast<uint64_t>(POINTS_SIZE - 1));
+		uint64_t x = Math::clamp(static_cast<uint64_t>(fx), 0ULL, static_cast<uint64_t>(POINTS_SIZE - 1));
+		uint64_t y = Math::clamp(static_cast<uint64_t>(fy), 0ULL, static_cast<uint64_t>(POINTS_SIZE - 1));
+		uint64_t z = Math::clamp(static_cast<uint64_t>(fz), 0ULL, static_cast<uint64_t>(POINTS_SIZE - 1));
 
 		uint64_t edge_id = (axis * POINTS_VOLUME) + (z * POINTS_AREA) + (y * POINTS_SIZE) + x;
 
