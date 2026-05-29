@@ -25,7 +25,9 @@ struct MeshData
 {
 	Vector3i chunk_pos{};
 	Ref<ArrayMesh> array_mesh;
-	uint32_t vertex_count = 0;
+	uint32_t vertex_count{ 0 };
+	uint32_t revision{ 0 };
+	RID chunk_space_rid{};
 };
 
 class MeshGenerator final : public ITaskProcessor<ChunkData*, MeshData>

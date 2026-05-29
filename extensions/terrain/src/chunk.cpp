@@ -50,6 +50,13 @@ void Chunk::update_chunk_mesh(const MeshData& p_mesh_data)
 		return;
 	}
 
+	// Trying to apply mesh that's based on an older revision
+	if (p_mesh_data.revision <= mesh_revision)
+	{
+		return;
+	}
+	mesh_revision = p_mesh_data.revision;
+
 	bool has_mesh = p_mesh_data.array_mesh.is_valid();
 	mesh_instance->set_visible(has_mesh);
 	if (has_mesh)
@@ -66,24 +73,15 @@ void Chunk::update_chunk_collision(const CollisionData& p_collision_data)
 {
 	ZoneScopedN("Chunk::update_chunk_collision");
 
-	if (!physics_body_rid.is_valid())
-	{
-		PhysicsServer3D* physics_server = PhysicsServer3D::get_singleton();
-		physics_body_rid = physics_server->body_create();
-		physics_server->body_set_mode(physics_body_rid, PhysicsServer3D::BODY_MODE_STATIC);
-
-		// Assign body to this chunk's world space
-		RID space = get_tree()->get_root()->get_world_3d()->get_space();
-		physics_server->body_set_space(physics_body_rid, space);
-	}
-
-	if (!physics_body_rid.is_valid())
+	// Trying to apply collision that's based on an older revision
+	if (p_collision_data.revision <= collision_revision)
 	{
 		return;
 	}
+	collision_revision = p_collision_data.revision;
 
+	// TODO: Move the cleanup to another thread and/or use pooling
 	PhysicsServer3D* physics_server = PhysicsServer3D::get_singleton();
-	physics_server->body_set_state(physics_body_rid, PhysicsServer3D::BODY_STATE_TRANSFORM, get_transform());
 
 	// Clean up old collision shape
 	if (collision_shape_rid.is_valid())
@@ -92,13 +90,18 @@ void Chunk::update_chunk_collision(const CollisionData& p_collision_data)
 		physics_server->free_rid(collision_shape_rid);
 		collision_shape_rid = RID();
 	}
-
-	// Assign the new shape if it's valid
-	if (p_collision_data.shape_rid.is_valid())
+	// Clean up old physics
+	if (physics_body_rid.is_valid())
 	{
-		collision_shape_rid = p_collision_data.shape_rid;
-		physics_server->body_add_shape(physics_body_rid, collision_shape_rid);
+		physics_server->free_rid(physics_body_rid);
+		physics_body_rid = RID();
 	}
+	if (!p_collision_data.body_rid.is_valid() || !p_collision_data.shape_rid.is_valid())
+	{
+		return;
+	}
+	physics_body_rid = p_collision_data.body_rid;
+	collision_shape_rid = p_collision_data.shape_rid;
 }
 
 void Chunk::set_material(Ref<StandardMaterial3D> p_material)
@@ -107,4 +110,9 @@ void Chunk::set_material(Ref<StandardMaterial3D> p_material)
 	{
 		mesh_instance->set_material_override(p_material);
 	}
+}
+
+RID Chunk::get_space() const
+{
+	return get_tree()->get_root()->get_world_3d()->get_space();
 }

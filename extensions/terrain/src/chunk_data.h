@@ -21,7 +21,8 @@ struct alignas(64) ChunkData
 {
 	std::array<uint8_t, terrain_constants::POINTS_VOLUME> points{};
 	Vector3i position{};
-	int surface_sum{0};
+	uint32_t surface_sum{ 0 };
+	uint32_t revision{ 0 }; // Shouldn't be serialized
 	SurfaceState surface_state = SurfaceState::EMPTY;
 };
 

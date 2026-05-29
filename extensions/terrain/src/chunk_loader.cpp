@@ -187,14 +187,24 @@ void ChunkLoader::update()
 		CharString utf8_text = info_text.utf8();
 		ZoneText(utf8_text.get_data(), utf8_text.length());
 
-		// TODO: only queue close chunks, use the Chunk Viewer to manage this
-		Vector3 centre_pos = chunk_viewer->get_current_chunk_pos();
-		float collision_radius_sqr = 2 * 2;
-		for (const MeshData& mesh_data : done_mesh_datas)
 		{
-			if (centre_pos.distance_squared_to(mesh_data.chunk_pos) < collision_radius_sqr)
+			ZoneNamedN(zoneQueueChunksForCollision, "Queue chunks for collision", true);
+
+			Vector3 centre_pos = chunk_viewer->get_current_chunk_pos();
+			float collision_radius_sqr = 3 * 3;
+			for (MeshData& mesh_data : done_mesh_datas)
 			{
-				collision_generator_pool->queue_task(done_mesh_datas);
+				if (centre_pos.distance_squared_to(mesh_data.chunk_pos) < collision_radius_sqr)
+				{
+					// TODO: use a collision gen task instead of mesh data.
+					// TODO: calling get_chunk could cause frame spikes. handle getting the space RID earlier.
+					// - Chunk might not exist yet, and calling get_chunk will create it
+					if (Chunk* chunk = get_chunk(mesh_data.chunk_pos))
+					{
+						mesh_data.chunk_space_rid = chunk->get_space();
+						collision_generator_pool->queue_task(mesh_data);
+					}
+				}
 			}
 		}
 
@@ -404,6 +414,8 @@ void ChunkLoader::modify_terrain(Vector3 global_position, bool is_subtract)
 		return;
 	}
 
+	chunk_data->revision++;
+
 	Vector3 position;
 	position.x = global_position.x - (float)(chunk_pos.x * CHUNK_SIZE);
 	position.y = global_position.y - (float)(chunk_pos.y * CHUNK_SIZE);
@@ -462,6 +474,8 @@ void ChunkLoader::modify_terrain(Vector3 global_position, bool is_subtract)
 
 Chunk* ChunkLoader::get_chunk(Vector3i chunk_pos)
 {
+	ZoneScopedN("ChunkLoader::get_chunk");
+
 	auto it = chunk_node_map.find(chunk_pos);
 	if (it != chunk_node_map.end())
 	{

@@ -12,6 +12,8 @@
 #include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
 
+#include <cstdint>
+
 struct MeshData;
 
 using namespace godot;
@@ -19,7 +21,9 @@ using namespace godot;
 struct CollisionData
 {
 	Vector3i chunk_pos{};
+	RID body_rid{};
 	RID shape_rid{};
+	uint32_t revision{ 0 };
 };
 
 class CollisionGenerator final : public ITaskProcessor<MeshData, CollisionData>

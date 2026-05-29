@@ -12,6 +12,7 @@
 #include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_vector3_array.hpp>
 #include <godot_cpp/variant/rid.hpp>
+#include <godot_cpp/variant/transform3d.hpp>
 #include <godot_cpp/variant/variant.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
@@ -25,7 +26,7 @@ static PackedVector3Array optimise_mesh_to_faces(const PackedVector3Array& verts
 
 CollisionData CollisionGenerator::process_task(MeshData p_mesh_data)
 {
-	CollisionData result{ p_mesh_data.chunk_pos, RID() };
+	CollisionData result{ p_mesh_data.chunk_pos, RID(), RID(), p_mesh_data.revision };
 
 	if (!p_mesh_data.array_mesh.is_valid())
 	{
@@ -37,6 +38,14 @@ CollisionData CollisionGenerator::process_task(MeshData p_mesh_data)
 	if (optimized_faces.size() > 0)
 	{
 		PhysicsServer3D* physics_server = PhysicsServer3D::get_singleton();
+
+		RID new_body_rid = physics_server->body_create();
+		physics_server->body_set_mode(new_body_rid, PhysicsServer3D::BODY_MODE_STATIC);
+		physics_server->body_set_space(new_body_rid, p_mesh_data.chunk_space_rid);
+
+		Vector3 target_position = p_mesh_data.chunk_pos * CHUNK_SIZE;
+		physics_server->body_set_state(new_body_rid, PhysicsServer3D::BODY_STATE_TRANSFORM, Transform3D{ {}, target_position });
+
 		RID new_shape_rid = physics_server->concave_polygon_shape_create();
 
 		Dictionary shape_data{};
@@ -46,6 +55,9 @@ CollisionData CollisionGenerator::process_task(MeshData p_mesh_data)
 		Variant shape_data_as_variant = shape_data;
 		physics_server->shape_set_data(new_shape_rid, shape_data_as_variant);
 
+		physics_server->body_add_shape(new_body_rid, new_shape_rid);
+
+		result.body_rid = new_body_rid;
 		result.shape_rid = new_shape_rid;
 	}
 

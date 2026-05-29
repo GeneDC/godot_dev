@@ -168,6 +168,7 @@ MeshData MeshGenerator::process_task(ChunkData* chunk_data)
 {
 	MeshData mesh_data{};
 	mesh_data.chunk_pos = chunk_data->position;
+	mesh_data.revision = chunk_data->revision;
 
 	// No mesh to generate if the chunk is entirely empty or full
 	// TODO: Rework this check when we need to generate with the surrounding chunks

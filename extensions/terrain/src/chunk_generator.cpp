@@ -50,6 +50,7 @@ ChunkData* ChunkGenerator::process_task(ChunkData* chunk_data)
 	ZoneScopedN("Generate Chunk Data");
 
 	chunk_data->surface_sum = 0;
+	chunk_data->revision++;
 
 	Vector3 chunk_world_pos = chunk_data->position * CHUNK_SIZE;
 	bool did_generate_height_map = generate_height_map(chunk_world_pos);
