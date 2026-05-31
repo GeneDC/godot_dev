@@ -159,6 +159,8 @@ bool ChunkLoader::init()
 
 	chunk_viewer->reset();
 
+	chunk_node_map.reserve(32 * 32 * 32); // Reserve space for target chunk load distance
+
 	state = State::Ready;
 	return true;
 }
