@@ -346,8 +346,21 @@ void ChunkLoader::try_update_chunks()
 		return;
 	}
 
+
+	// Check if the current update chunks task has completed before trying to start another
+	if (update_chunks_task_id != WorkerThreadPool::INVALID_TASK_ID)
+	{
+		if (!WorkerThreadPool::get_singleton()->is_task_completed(update_chunks_task_id))
+		{
+			return;
+		}
+		// Wait for task to cleanup
+		WorkerThreadPool::get_singleton()->wait_for_task_completion(update_chunks_task_id);
+		update_chunks_task_id = WorkerThreadPool::INVALID_TASK_ID;
+	}
+
 	Callable update_func = callable_mp(this, &ChunkLoader::_update_chunks);
-	WorkerThreadPool::get_singleton()->add_task(update_func);
+	update_chunks_task_id = WorkerThreadPool::get_singleton()->add_task(update_func);
 }
 
 void ChunkLoader::_update_chunks()

@@ -12,6 +12,7 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/standard_material3d.hpp>
+#include <godot_cpp/classes/worker_thread_pool.hpp>
 #include <godot_cpp/classes/wrapped.hpp>
 #include <godot_cpp/templates/hash_map.hpp>
 #include <godot_cpp/variant/vector3.hpp>
@@ -93,4 +94,6 @@ private:
 
 	using CollisionGeneratorPool = ThreadPool<CollisionGenerator, MeshData, CollisionData>;
 	Ref<CollisionGeneratorPool> collision_generator_pool;
+
+	WorkerThreadPool::TaskID update_chunks_task_id{ WorkerThreadPool::INVALID_TASK_ID };
 };
