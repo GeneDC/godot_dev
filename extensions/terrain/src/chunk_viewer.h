@@ -4,11 +4,13 @@
 #include <godot_cpp/classes/wrapped.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
 
-#include <concurrent_chunk_map.h>
+#include "concurrent_chunk_map.h"
+
 #include <cstdint>
-#include <vector>
 #include <memory>
-#include <shared_mutex>
+#include <mutex>
+#include <vector>
+
 
 using namespace godot;
 
@@ -19,7 +21,7 @@ class ChunkViewer : public Node3D
 public:
 	std::shared_ptr<ConcurrentChunkMap> chunk_map;
 
-	std::vector<Vector3i> get_chunk_positions(int64_t count);
+	std::vector<Vector3i> get_chunk_positions(int64_t max_count);
 
 	void reset();
 
@@ -32,12 +34,11 @@ protected:
 
 private:
 	void update_view();
-	void reset_unblocking();
 
 	int current_shell = 0;
 	int current_index = 0;
 
 	Vector3i last_chunk_pos = Vector3i(0, 0, 0);
 
-	std::shared_mutex mutex{};
+	std::mutex mutex{};
 };

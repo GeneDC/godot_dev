@@ -1,5 +1,6 @@
 #include "chunk_viewer.h"
 
+#include "chunk_data.h"
 #include "chunk_lut.gen.h"
 #include "terrain_constants.h"
 
@@ -8,6 +9,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <mutex>
 
 using namespace godot;
 
@@ -18,7 +20,7 @@ void ChunkViewer::_bind_methods()
 
 std::vector<Vector3i> ChunkViewer::get_chunk_positions(int64_t max_count)
 {
-	std::unique_lock lock(mutex); // Write lock as we change current_shell and current_index
+	std::lock_guard<std::mutex> lock(mutex);
 
 	ShellRange range = CHUNK_SHELL_RANGES[current_shell];
 
@@ -51,9 +53,11 @@ std::vector<Vector3i> ChunkViewer::get_chunk_positions(int64_t max_count)
 
 void ChunkViewer::reset()
 {
-	mutex.lock();
-	reset_unblocking();
-	mutex.unlock();
+	std::lock_guard<std::mutex> lock(mutex);
+
+	current_shell = 0;
+	current_index = 0;
+	last_chunk_pos = get_current_chunk_pos();
 }
 
 Vector3i ChunkViewer::get_current_chunk_pos() const
@@ -74,16 +78,6 @@ void ChunkViewer::update_view()
 	{
 		return;
 	}
-	if (mutex.try_lock())
-	{
-		reset_unblocking();
-		mutex.unlock();
-	}
-}
 
-void ChunkViewer::reset_unblocking()
-{
-	current_shell = 0;
-	current_index = 0;
-	last_chunk_pos = get_current_chunk_pos();
+	reset();
 }

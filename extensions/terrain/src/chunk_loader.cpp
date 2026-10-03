@@ -358,6 +358,13 @@ void ChunkLoader::_update_chunks()
 		return;
 	}
 
+	// TODO: Currently this only handles generating new chunks and meshing them. We need to:
+	// - Generate collisions for existing chunks
+	//		- update chunk_viewer->get_chunk_positions to instead return different lists of chunks with different requirements
+	//		- e.g. needs generation ( + mesh + collision), needs load ( + mesh + collision), or just collision from existing mesh
+	// - Handle chunk unloading / scavenging
+	// - Load chunks from disc / memory (when unloading is implemented)
+
 	constexpr int64_t CHUNK_GEN_BATCH_SIZE = 128;
 	std::vector<Vector3i> chunk_positions = chunk_viewer->get_chunk_positions(CHUNK_GEN_BATCH_SIZE);
 	if (chunk_positions.size() > 0)
