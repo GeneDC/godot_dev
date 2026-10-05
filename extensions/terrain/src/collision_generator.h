@@ -21,7 +21,6 @@ using namespace godot;
 struct CollisionData
 {
 	Vector3i chunk_pos{};
-	RID body_rid{};
 	RID shape_rid{};
 	uint32_t revision{ 0 };
 };
@@ -45,6 +44,4 @@ public:
 protected:
 	static void _bind_methods() {}
 
-private:
-	Ref<ArrayMesh> optimise_mesh(const PackedVector3Array& verts);
 };

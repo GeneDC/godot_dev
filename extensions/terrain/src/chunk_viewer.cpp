@@ -1,17 +1,15 @@
 #include "chunk_viewer.h"
 
-#include "chunk.h"
 #include "chunk_data.h"
 #include "chunk_lut.gen.h"
 #include "terrain_constants.h"
 
 #include <godot_cpp/core/class_db.hpp>
-#include <godot_cpp/templates/hash_map.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
+#include <tracy/Tracy.hpp>
 
 #include <cstdint>
 #include <mutex>
-#include <utility>
 #include <vector>
 
 using namespace godot;
@@ -21,16 +19,15 @@ void ChunkViewer::_bind_methods()
 	ClassDB::bind_method(D_METHOD("get_current_chunk_pos"), &ChunkViewer::get_current_chunk_pos);
 }
 
-void ChunkViewer::get_chunk_positions(
-		std::vector<Vector3i>& generate_positions, std::vector<std::pair<Vector3i, Chunk*>>& collision_chunks,
-		int64_t max_count, HashMap<Vector3i, Chunk*>& chunk_node_map)
+void ChunkViewer::get_chunk_positions(std::vector<Vector3i>& generate_positions, int64_t max_count)
 {
+	ZoneScopedN("ChunkViewer::get_chunk_positions");
+
 	std::lock_guard<std::mutex> lock(mutex);
 
 	ShellRange range = CHUNK_SHELL_RANGES[current_shell];
 
 	generate_positions.reserve(max_count);
-	collision_chunks.reserve(max_count);
 
 	while (generate_positions.size() < max_count)
 	{
@@ -46,21 +43,7 @@ void ChunkViewer::get_chunk_positions(
 			range = CHUNK_SHELL_RANGES[current_shell];
 		}
 		Vector3i chunk_pos = last_chunk_pos + CHUNK_LUT[range.start + current_index];
-		if (ChunkData* chunk_data = chunk_map->get_chunk(chunk_pos))
-		{
-			auto chunk_node_it = chunk_node_map.find(chunk_pos);
-			if (chunk_node_it != chunk_node_map.end())
-			{
-				Chunk* chunk_node = chunk_node_it->value;
-				if (chunk_data->surface_state == SurfaceState::MIXED &&
-					chunk_data->revision > chunk_node->get_collision_revision() &&
-					should_chunk_have_collision(chunk_pos))
-				{
-					collision_chunks.push_back({ chunk_pos, chunk_node });
-				}
-			}
-		}
-		else
+		if (!chunk_map->has_chunk(chunk_pos))
 		{
 			generate_positions.push_back(chunk_pos);
 		}

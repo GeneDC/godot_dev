@@ -2,6 +2,7 @@
 
 #include "chunk_data.h"
 #include "chunk_generator.h"
+#include "chunk_lut.gen.h"
 #include "collision_generator.h"
 #include "concurrent_chunk_map.h"
 #include "godot_utility.h"
@@ -10,9 +11,11 @@
 #include "terrain_performance_monitor.h"
 #include "thread_pool.h"
 
+#include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/global_constants.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
+#include <godot_cpp/classes/thread.hpp>
 #include <godot_cpp/classes/time.hpp>
 #include <godot_cpp/classes/viewport.hpp>
 #include <godot_cpp/classes/window.hpp>
@@ -27,6 +30,7 @@
 #include <godot_cpp/variant/callable.hpp>
 #include <godot_cpp/variant/callable_method_pointer.hpp>
 #include <godot_cpp/variant/char_string.hpp>
+#include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/variant.hpp>
 #include <godot_cpp/variant/vector3.hpp>
@@ -37,8 +41,6 @@
 #include <chunk.h>
 #include <cstdint>
 #include <cstdio>
-#include <godot_cpp/classes/thread.hpp>
-#include <godot_cpp/variant/rid.hpp>
 #include <iterator>
 #include <memory>
 #include <utility>
@@ -148,10 +150,9 @@ bool ChunkLoader::init()
 
 	if (collision_generator_pool->get_state() == ThreadPoolState::Stopped)
 	{
-		RID physics_space = get_tree()->get_root()->get_world_3d()->get_space();
 		constexpr int64_t collision_generator_thread_count = 1;
-		collision_generator_pool->init(collision_generator_thread_count, "", [physics_space]()
-				{ return CollisionGenerator::create(physics_space); });
+		collision_generator_pool->init(collision_generator_thread_count, "", []()
+				{ return CollisionGenerator::create(); });
 	}
 	else
 	{
@@ -212,19 +213,6 @@ void ChunkLoader::update()
 		CharString utf8_text = info_text.utf8();
 		ZoneText(utf8_text.get_data(), utf8_text.length());
 
-		{
-			ZoneNamedN(zoneQueueChunksForCollision, "Queue chunks for collision", true);
-
-			for (MeshData& mesh_data : done_mesh_datas)
-			{
-				// Don't bother checking mesh revision vs collision revision as we know the mesh was just updated
-				if (chunk_viewer->should_chunk_have_collision(mesh_data.chunk_pos))
-				{
-					collision_generator_pool->queue_task(mesh_data);
-				}
-			}
-		}
-
 		if (!done_mesh_datas.empty())
 		{
 			mesh_datas.insert(
@@ -265,6 +253,8 @@ void ChunkLoader::update()
 			chunk->update_chunk_mesh(mesh_data);
 		}
 	}
+
+	update_chunk_collisions();
 
 	start_time = Time::get_singleton()->get_ticks_usec();
 	constexpr uint64_t collision_time_budget = 2000;
@@ -387,19 +377,16 @@ void ChunkLoader::_update_chunks()
 	}
 
 	// TODO: Currently this only handles generating new chunks and meshing them. We need to:
-	// - Generate collisions for existing chunks
-	//		- update chunk_viewer->get_chunk_positions to instead return different lists of chunks with different requirements
-	//		- e.g. needs generation ( + mesh + collision), needs load ( + mesh + collision), or just collision from existing mesh
 	// - Handle chunk unloading / scavenging
-	// - Load chunks from disc / memory (when unloading is implemented)
+	//		- Make sure we aren't re-creating any nodes, e.g. chunk, mesh, and collision nodes
+	//		- Potentially create them all at the start
+	// - save/load chunks to/from disc (when unloading is implemented)
 
 	std::vector<Vector3i> generate_positions;
-	std::vector<std::pair<Vector3i, Chunk*>> collision_chunks;
 	constexpr int64_t CHUNK_GEN_BATCH_SIZE = 128;
-	chunk_viewer->get_chunk_positions(generate_positions, collision_chunks, CHUNK_GEN_BATCH_SIZE, chunk_node_map);
-
+	chunk_viewer->get_chunk_positions(generate_positions, CHUNK_GEN_BATCH_SIZE);
 	{
-		ZoneNamedN(zoneQueueChunksForCollision, "Queue chunks for generation", true);
+		ZoneNamedN(zoneQueueChunksForGeneration, "Queue chunks for generation", true);
 		if (generate_positions.size() > 0)
 		{
 			std::vector<ChunkData*> chunks_to_generate;
@@ -412,6 +399,7 @@ void ChunkLoader::_update_chunks()
 			chunk_generator_pool->queue_task(chunks_to_generate);
 		}
 	}
+	std::vector<std::pair<Vector3i, Chunk*>> collision_chunks;
 	{
 		ZoneNamedN(zoneQueueChunksForCollision, "Queue chunks for collision", true);
 		if (collision_chunks.size() > 0)
@@ -440,6 +428,89 @@ void ChunkLoader::_update_chunks()
 	std::erase_if(chunk_datas, [](ChunkData* chunk_data)
 			{ return chunk_data->surface_state != SurfaceState::MIXED; });
 	mesh_generator_pool->queue_task(chunk_datas);
+}
+
+void ChunkLoader::update_chunk_collisions()
+{
+	ZoneScopedN("ChunkLoader::update_chunk_collisions");
+
+	if (!chunk_viewer || !chunk_map || !collision_generator_pool.is_valid())
+	{
+		return;
+	}
+
+	if (collision_generator_pool->get_task_count() > 0 || !collision_datas.empty())
+	{
+		return;
+	}
+
+	Vector3i viewer_chunk_pos = chunk_viewer->get_current_chunk_pos();
+	// Limit collision updates per frame to avoid hitches
+	constexpr size_t MAX_COLLISION_TASKS_PER_UPDATE = 2;
+	std::vector<MeshData> collision_tasks;
+	collision_tasks.reserve(MAX_COLLISION_TASKS_PER_UPDATE);
+
+	for (int shell = 0; shell < CHUNK_SHELL_RANGE_COUNT; ++shell)
+	{
+		ShellRange range = CHUNK_SHELL_RANGES[shell];
+		bool any_in_range = false;
+
+		for (int32_t i = range.start; i < range.end; ++i)
+		{
+			Vector3i chunk_pos = viewer_chunk_pos + CHUNK_LUT[i];
+
+			if (!chunk_viewer->should_chunk_have_collision(chunk_pos))
+			{
+				continue;
+			}
+
+			any_in_range = true;
+
+			ChunkData* chunk_data = chunk_map->get_chunk(chunk_pos);
+			if (!chunk_data || chunk_data->surface_state != SurfaceState::MIXED)
+			{
+				continue;
+			}
+
+			Chunk* chunk_node = get_chunk_node(chunk_pos);
+			if (!chunk_node)
+			{
+				continue;
+			}
+
+			if (chunk_node->get_mesh_revision() > 0 && chunk_node->get_collision_revision() < chunk_node->get_mesh_revision())
+			{
+				Ref<ArrayMesh> mesh = chunk_node->get_array_mesh();
+				if (mesh.is_valid())
+				{
+					MeshData mesh_data = {
+						chunk_pos,
+						mesh,
+						0, // Collision gen doesn't need vertex count
+						chunk_node->get_mesh_revision()
+					};
+					collision_tasks.push_back(mesh_data);
+
+					if (collision_tasks.size() >= MAX_COLLISION_TASKS_PER_UPDATE)
+					{
+						collision_generator_pool->queue_task(collision_tasks);
+						return;
+					}
+				}
+			}
+		}
+
+		if (!any_in_range)
+		{
+			// Avoid processing all shell ranges if we exhaused this one.
+			break;
+		}
+	}
+
+	if (!collision_tasks.empty())
+	{
+		collision_generator_pool->queue_task(collision_tasks);
+	}
 }
 
 void ChunkLoader::unload_all()

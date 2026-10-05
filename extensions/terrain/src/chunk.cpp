@@ -3,19 +3,18 @@
 #include "collision_generator.h"
 #include "mesh_generator.h"
 
+#include <godot_cpp/classes/array_mesh.hpp>
+#include <godot_cpp/classes/mesh.hpp>
 #include <godot_cpp/classes/mesh_instance3d.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/node3d.hpp>
+#include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/classes/physics_server3d.hpp>
 #include <godot_cpp/classes/ref.hpp>
-#include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/standard_material3d.hpp>
-#include <godot_cpp/classes/viewport.hpp>
-#include <godot_cpp/classes/window.hpp>
 #include <godot_cpp/classes/world3d.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/variant/rid.hpp>
-
 #include <tracy/Tracy.hpp>
 
 using namespace godot;
@@ -73,15 +72,29 @@ void Chunk::update_chunk_collision(const CollisionData& p_collision_data)
 {
 	ZoneScopedN("Chunk::update_chunk_collision");
 
-	// Trying to apply collision that's based on an older revision
 	if (p_collision_data.revision <= collision_revision)
 	{
+		if (p_collision_data.shape_rid.is_valid())
+		{
+			PhysicsServer3D::get_singleton()->free_rid(p_collision_data.shape_rid);
+		}
 		return;
 	}
 	collision_revision = p_collision_data.revision;
 
-	// TODO: Move the cleanup to another thread and/or use pooling
 	PhysicsServer3D* physics_server = PhysicsServer3D::get_singleton();
+
+	// Keep the static body persistent
+	if (!physics_body_rid.is_valid())
+	{
+		physics_body_rid = physics_server->body_create();
+		physics_server->body_set_mode(physics_body_rid, PhysicsServer3D::BODY_MODE_STATIC);
+		if (is_inside_tree() && get_world_3d().is_valid())
+		{
+			physics_server->body_set_space(physics_body_rid, get_world_3d()->get_space());
+		}
+		physics_server->body_set_state(physics_body_rid, PhysicsServer3D::BODY_STATE_TRANSFORM, get_global_transform());
+	}
 
 	// Clean up old collision shape
 	if (collision_shape_rid.is_valid())
@@ -90,18 +103,13 @@ void Chunk::update_chunk_collision(const CollisionData& p_collision_data)
 		physics_server->free_rid(collision_shape_rid);
 		collision_shape_rid = RID();
 	}
-	// Clean up old physics
-	if (physics_body_rid.is_valid())
+
+	// Attach new shape in-place without moving or recreating the body
+	if (p_collision_data.shape_rid.is_valid())
 	{
-		physics_server->free_rid(physics_body_rid);
-		physics_body_rid = RID();
+		collision_shape_rid = p_collision_data.shape_rid;
+		physics_server->body_add_shape(physics_body_rid, collision_shape_rid);
 	}
-	if (!p_collision_data.body_rid.is_valid() || !p_collision_data.shape_rid.is_valid())
-	{
-		return;
-	}
-	physics_body_rid = p_collision_data.body_rid;
-	collision_shape_rid = p_collision_data.shape_rid;
 }
 
 void Chunk::set_material(Ref<StandardMaterial3D> p_material)
@@ -112,7 +120,20 @@ void Chunk::set_material(Ref<StandardMaterial3D> p_material)
 	}
 }
 
-RID Chunk::get_space() const
+Ref<ArrayMesh> Chunk::get_array_mesh() const
 {
-	return get_tree()->get_root()->get_world_3d()->get_space();
+	if (!mesh_instance)
+	{
+		return Ref<ArrayMesh>();
+	}
+
+	Ref<Mesh> base_mesh = mesh_instance->get_mesh();
+	if (base_mesh.is_null())
+	{
+		return Ref<ArrayMesh>();
+	}
+
+	// Assumes that the mesh is ArrayMesh
+	ArrayMesh* array_mesh = Object::cast_to<ArrayMesh>(base_mesh.ptr());
+	return { array_mesh };
 }

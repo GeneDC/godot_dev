@@ -79,6 +79,7 @@ private:
 
 	void try_update_chunks();
 	void _update_chunks();
+	void update_chunk_collisions();
 
 	Chunk* _create_chunk_node(Vector3i chunk_pos);
 
