@@ -12,8 +12,12 @@
 
 #include <godot_cpp/classes/global_constants.hpp>
 #include <godot_cpp/classes/ref.hpp>
+#include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/time.hpp>
+#include <godot_cpp/classes/viewport.hpp>
+#include <godot_cpp/classes/window.hpp>
 #include <godot_cpp/classes/worker_thread_pool.hpp>
+#include <godot_cpp/classes/world3d.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/defs.hpp>
 #include <godot_cpp/core/math.hpp>
@@ -33,8 +37,11 @@
 #include <chunk.h>
 #include <cstdint>
 #include <cstdio>
+#include <godot_cpp/classes/thread.hpp>
+#include <godot_cpp/variant/rid.hpp>
 #include <iterator>
 #include <memory>
+#include <utility>
 #include <vector>
 
 using namespace godot;
@@ -93,6 +100,13 @@ bool ChunkLoader::init()
 		return false;
 	}
 
+	if (!is_inside_tree() && !get_tree()->get_root()->get_world_3d().is_valid())
+	{
+		// Make sure this function is called after ChunkLoader is added to the scene and is ready
+		PRINT_ERROR("ChunkLoader::init called before it has been added to the tree and is ready!");
+		return false;
+	}
+
 	if (!mesh_generator_pool.is_valid())
 	{
 		mesh_generator_pool.reference_ptr(memnew((MeshGeneratorPool)));
@@ -134,9 +148,10 @@ bool ChunkLoader::init()
 
 	if (collision_generator_pool->get_state() == ThreadPoolState::Stopped)
 	{
+		RID physics_space = get_tree()->get_root()->get_world_3d()->get_space();
 		constexpr int64_t collision_generator_thread_count = 1;
-		collision_generator_pool->init(collision_generator_thread_count, "", []()
-				{ return CollisionGenerator::create(); });
+		collision_generator_pool->init(collision_generator_thread_count, "", [physics_space]()
+				{ return CollisionGenerator::create(physics_space); });
 	}
 	else
 	{
@@ -167,12 +182,20 @@ bool ChunkLoader::init()
 
 void ChunkLoader::update()
 {
+	ZoneScopedN("ChunkLoader::update");
+
+	if (!godot::Thread::is_main_thread())
+	{
+		// This function needs to create Chunk nodes
+		PRINT_ERROR("ChunkLoader::update must be called from the main thread");
+		return;
+	}
+
 	if (state != State::Ready)
 	{
 		PRINT_ERROR("Chunk Loader is not Ready");
 		return;
 	}
-	ZoneScopedN("ChunkLoader::update");
 
 	try_update_chunks();
 
@@ -192,20 +215,12 @@ void ChunkLoader::update()
 		{
 			ZoneNamedN(zoneQueueChunksForCollision, "Queue chunks for collision", true);
 
-			Vector3 centre_pos = chunk_viewer->get_current_chunk_pos();
-			float collision_radius_sqr = 3 * 3;
 			for (MeshData& mesh_data : done_mesh_datas)
 			{
-				if (centre_pos.distance_squared_to(mesh_data.chunk_pos) < collision_radius_sqr)
+				// Don't bother checking mesh revision vs collision revision as we know the mesh was just updated
+				if (chunk_viewer->should_chunk_have_collision(mesh_data.chunk_pos))
 				{
-					// TODO: use a collision gen task instead of mesh data.
-					// TODO: calling get_chunk could cause frame spikes. handle getting the space RID earlier.
-					// - Chunk might not exist yet, and calling get_chunk will create it
-					if (Chunk* chunk = get_chunk(mesh_data.chunk_pos))
-					{
-						mesh_data.chunk_space_rid = chunk->get_space();
-						collision_generator_pool->queue_task(mesh_data);
-					}
+					collision_generator_pool->queue_task(mesh_data);
 				}
 			}
 		}
@@ -246,7 +261,7 @@ void ChunkLoader::update()
 			MeshData mesh_data = mesh_datas.back();
 			mesh_datas.pop_back();
 
-			Chunk* chunk = get_chunk(mesh_data.chunk_pos);
+			Chunk* chunk = get_or_create_chunk_node(mesh_data.chunk_pos);
 			chunk->update_chunk_mesh(mesh_data);
 		}
 	}
@@ -302,7 +317,7 @@ void ChunkLoader::update()
 			CollisionData collision_data = collision_datas.back();
 			collision_datas.pop_back();
 
-			Chunk* chunk = get_chunk(collision_data.chunk_pos);
+			Chunk* chunk = get_or_create_chunk_node(collision_data.chunk_pos);
 			chunk->update_chunk_collision(collision_data);
 		}
 	}
@@ -378,18 +393,45 @@ void ChunkLoader::_update_chunks()
 	// - Handle chunk unloading / scavenging
 	// - Load chunks from disc / memory (when unloading is implemented)
 
+	std::vector<Vector3i> generate_positions;
+	std::vector<std::pair<Vector3i, Chunk*>> collision_chunks;
 	constexpr int64_t CHUNK_GEN_BATCH_SIZE = 128;
-	std::vector<Vector3i> chunk_positions = chunk_viewer->get_chunk_positions(CHUNK_GEN_BATCH_SIZE);
-	if (chunk_positions.size() > 0)
-	{
-		std::vector<ChunkData*> chunks_to_generate;
-		chunks_to_generate.reserve(chunk_positions.size());
-		for (Vector3i chunk_pos : chunk_positions)
-		{
-			chunks_to_generate.push_back(chunk_map->get_or_create(chunk_pos));
-		}
+	chunk_viewer->get_chunk_positions(generate_positions, collision_chunks, CHUNK_GEN_BATCH_SIZE, chunk_node_map);
 
-		chunk_generator_pool->queue_task(chunks_to_generate);
+	{
+		ZoneNamedN(zoneQueueChunksForCollision, "Queue chunks for generation", true);
+		if (generate_positions.size() > 0)
+		{
+			std::vector<ChunkData*> chunks_to_generate;
+			chunks_to_generate.reserve(generate_positions.size());
+			for (const Vector3i& chunk_pos : generate_positions)
+			{
+				chunks_to_generate.push_back(chunk_map->get_or_create(chunk_pos));
+			}
+
+			chunk_generator_pool->queue_task(chunks_to_generate);
+		}
+	}
+	{
+		ZoneNamedN(zoneQueueChunksForCollision, "Queue chunks for collision", true);
+		if (collision_chunks.size() > 0)
+		{
+			std::vector<MeshData> chunks_to_add_collision;
+			chunks_to_add_collision.reserve(collision_chunks.size());
+			for (const auto& [chunk_pos, chunk_node] : collision_chunks)
+			{
+				MeshData mesh_data = {
+					chunk_pos,
+					chunk_node->get_array_mesh(),
+					0, // Collision gen doesn't care about vertex count
+					chunk_node->get_mesh_revision()
+				};
+
+				chunks_to_add_collision.push_back(mesh_data);
+			}
+
+			collision_generator_pool->queue_task(chunks_to_add_collision);
+		}
 	}
 
 	// TODO: Add a better way to queue these tasks. Pipe the chunk_generator_pool to the mesh_generator_pool
@@ -494,9 +536,21 @@ void ChunkLoader::modify_terrain(Vector3 global_position, bool is_subtract)
 	mesh_generator_pool->queue_task(chunk_data, true);
 }
 
-Chunk* ChunkLoader::get_chunk(Vector3i chunk_pos)
+Chunk* ChunkLoader::get_or_create_chunk_node(Vector3i chunk_pos)
 {
-	ZoneScopedN("ChunkLoader::get_chunk");
+	ZoneScopedN("ChunkLoader::get_or_create_chunk_node");
+
+	if (Chunk* chunk = get_chunk_node(chunk_pos))
+	{
+		return chunk;
+	}
+
+	return _create_chunk_node(chunk_pos);
+}
+
+Chunk* ChunkLoader::get_chunk_node(Vector3i chunk_pos)
+{
+	ZoneScopedN("ChunkLoader::get_chunk_node");
 
 	auto it = chunk_node_map.find(chunk_pos);
 	if (it != chunk_node_map.end())
@@ -504,6 +558,14 @@ Chunk* ChunkLoader::get_chunk(Vector3i chunk_pos)
 		return it->value;
 	}
 
+	return nullptr;
+}
+
+Chunk* ChunkLoader::_create_chunk_node(Vector3i chunk_pos)
+{
+	ZoneScopedN("ChunkLoader::_create_chunk_node");
+
+	// TODO: use an object pool
 	Chunk* chunk = memnew(Chunk);
 
 	chunk->set_position(chunk_pos * CHUNK_SIZE);

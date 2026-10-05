@@ -58,6 +58,9 @@ public:
 	int64_t get_pending_mesh_tasks_count() const { return mesh_generator_pool.is_valid() ? mesh_generator_pool->get_task_count() : 0; }
 	int64_t get_mesh_datas_count() const { return mesh_datas.size(); }
 
+	Chunk* get_or_create_chunk_node(Vector3i chunk_pos);
+	Chunk* get_chunk_node(Vector3i chunk_pos);
+
 	Ref<StandardMaterial3D> material;
 
 protected:
@@ -73,10 +76,11 @@ protected:
 	void set_material(Ref<StandardMaterial3D> p_material) { material = p_material; }
 
 private:
-	Chunk* get_chunk(Vector3i chunk_pos);
 
 	void try_update_chunks();
 	void _update_chunks();
+
+	Chunk* _create_chunk_node(Vector3i chunk_pos);
 
 	State state = State::Stopped;
 
