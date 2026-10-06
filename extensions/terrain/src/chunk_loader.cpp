@@ -388,14 +388,14 @@ void ChunkLoader::_update_chunks()
 		ZoneNamedN(zoneQueueChunksForGeneration, "Queue chunks for generation", true);
 		if (generate_positions.size() > 0)
 		{
-			std::vector<ChunkData*> chunks_to_generate;
+			std::vector<ChunkPtr> chunks_to_generate;
 			chunks_to_generate.reserve(generate_positions.size());
 			for (const Vector3i& chunk_pos : generate_positions)
 			{
-				chunks_to_generate.push_back(chunk_map->get_or_create(chunk_pos));
+				chunks_to_generate.push_back(chunk_map->acquire_chunk(chunk_pos));
 			}
 
-			chunk_generator_pool->queue_task(chunks_to_generate);
+			chunk_generator_pool->queue_task(std::move(chunks_to_generate));
 		}
 	}
 	std::vector<std::pair<Vector3i, Chunk*>> collision_chunks;
@@ -417,16 +417,26 @@ void ChunkLoader::_update_chunks()
 				chunks_to_add_collision.push_back(mesh_data);
 			}
 
-			collision_generator_pool->queue_task(chunks_to_add_collision);
+			collision_generator_pool->queue_task(std::move(chunks_to_add_collision));
 		}
 	}
 
 	// TODO: Add a better way to queue these tasks. Pipe the chunk_generator_pool to the mesh_generator_pool
-	std::vector<ChunkData*> chunk_datas = chunk_generator_pool->take_results();
-	// Remove empty and full chunks as they don't need to be generated
-	std::erase_if(chunk_datas, [](ChunkData* chunk_data)
-			{ return chunk_data->surface_state != SurfaceState::MIXED; });
-	mesh_generator_pool->queue_task(chunk_datas);
+	std::vector<ChunkPtr> chunk_ptrs = chunk_generator_pool->take_results();
+	if (chunk_ptrs.size() > 0)
+	{
+		std::vector<const ChunkData*> chunk_datas;
+		chunk_datas.reserve(chunk_ptrs.size());
+		for (int i = 0; i < chunk_ptrs.size(); ++i)
+		{
+			chunk_datas.push_back(chunk_map->publish_chunk(std::move(chunk_ptrs[i])));
+		}
+
+		// Remove empty and full chunks as they don't need to be generated
+		std::erase_if(chunk_datas, [](const ChunkData* chunk_data)
+				{ return chunk_data->surface_state != SurfaceState::MIXED; });
+		mesh_generator_pool->queue_task(std::move(chunk_datas));
+	}
 }
 
 void ChunkLoader::update_chunk_collisions()
@@ -465,7 +475,7 @@ void ChunkLoader::update_chunk_collisions()
 
 			any_in_range = true;
 
-			ChunkData* chunk_data = chunk_map->get_chunk(chunk_pos);
+			const ChunkData* chunk_data = chunk_map->get_chunk(chunk_pos);
 			if (!chunk_data || chunk_data->surface_state != SurfaceState::MIXED)
 			{
 				continue;
@@ -492,7 +502,7 @@ void ChunkLoader::update_chunk_collisions()
 
 					if (collision_tasks.size() >= MAX_COLLISION_TASKS_PER_UPDATE)
 					{
-						collision_generator_pool->queue_task(collision_tasks);
+						collision_generator_pool->queue_task(std::move(collision_tasks));
 						return;
 					}
 				}
@@ -508,7 +518,7 @@ void ChunkLoader::update_chunk_collisions()
 
 	if (!collision_tasks.empty())
 	{
-		collision_generator_pool->queue_task(collision_tasks);
+		collision_generator_pool->queue_task(std::move(collision_tasks));
 	}
 }
 
@@ -549,7 +559,7 @@ void ChunkLoader::modify_terrain(Vector3 global_position, bool is_subtract)
 			for (int cx = min_chunk.x; cx <= max_chunk.x; ++cx)
 			{
 				const Vector3i current_chunk_pos(cx, cy, cz);
-				ChunkData* chunk_data = chunk_map->get_chunk(current_chunk_pos);
+				const ChunkData* chunk_data = chunk_map->get_chunk(current_chunk_pos);
 				if (!chunk_data)
 				{
 					continue;
@@ -565,7 +575,7 @@ void ChunkLoader::modify_terrain(Vector3 global_position, bool is_subtract)
 	}
 }
 
-void ChunkLoader::modify_chunk(ChunkData* source_chunk_data, const TerrainModification& modification)
+void ChunkLoader::modify_chunk(const ChunkData* source_chunk_data, const TerrainModification& modification)
 {
 	ChunkPtr modified_chunk_data = chunk_map->acquire_chunk(source_chunk_data->position);
 	*modified_chunk_data = *source_chunk_data; // Copies the source data to the newly acquired chunk ptr
@@ -654,8 +664,8 @@ void ChunkLoader::modify_chunk(ChunkData* source_chunk_data, const TerrainModifi
 		modified_chunk_data->surface_state = SurfaceState::MIXED;
 	}
 
-	ChunkData* new_chunk_data = chunk_map->publish_chunk(std::move(modified_chunk_data));
-	mesh_generator_pool->queue_task(new_chunk_data, true);
+	const ChunkData* new_chunk_data = chunk_map->publish_chunk(std::move(modified_chunk_data));
+	mesh_generator_pool->queue_task(std::move(new_chunk_data), true);
 }
 
 Chunk* ChunkLoader::get_or_create_chunk_node(Vector3i chunk_pos)

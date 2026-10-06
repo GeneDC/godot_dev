@@ -52,8 +52,8 @@ protected:
 template <typename TProcessor, typename TTask, typename TResult>
 requires std::is_base_of_v<ITaskProcessor<TTask, TResult>, TProcessor> class ThreadPool : public ThreadPoolBase
 {
-	static_assert(std::is_copy_constructible_v<TTask>);
-	static_assert(std::is_copy_constructible_v<TResult>);
+	static_assert(std::is_move_constructible_v<TTask>);
+	static_assert(std::is_move_constructible_v<TResult>);
 
 public:
 	ThreadPoolState get_state() const { return state.load(); }
@@ -145,7 +145,7 @@ public:
 		state.store(ThreadPoolState::Stopped);
 	}
 
-	void queue_task(TTask task, bool prioritise = false)
+	void queue_task(TTask&& task, bool prioritise = false)
 	{
 		if (state.load() != ThreadPoolState::Ready)
 		{
@@ -153,10 +153,10 @@ public:
 			return;
 		}
 
-		task_queue.push(TTask(task), prioritise);
+		task_queue.push(std::move(task), prioritise);
 	}
 
-	void queue_task(std::vector<TTask> tasks, bool prioritise = false)
+	void queue_task(std::vector<TTask>&& tasks, bool prioritise = false)
 	{
 		if (state.load() != ThreadPoolState::Ready)
 		{
@@ -164,7 +164,7 @@ public:
 			return;
 		}
 
-		task_queue.push(tasks, prioritise);
+		task_queue.push(std::move(tasks), prioritise);
 	}
 
 	int64_t get_task_count() const
@@ -224,11 +224,11 @@ private:
 			if (!tasks_opt) break; // queue was cleared, stop processing
 
 			std::vector<TTask>& tasks = *tasks_opt;
-			for (TTask task : tasks)
+			for (int i = 0; i < tasks.size(); ++i)
 			{
 				if (state.load(std::memory_order_relaxed) == ThreadPoolState::Ready)
 				{
-					local_results_buffer.push_back(processor_ptr->process_task(task));
+					local_results_buffer.push_back(processor_ptr->process_task(std::move(tasks[i])));
 				}
 			}
 

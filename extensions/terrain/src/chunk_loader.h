@@ -62,7 +62,7 @@ public:
 
 	// TODO: Rename to modify_terrain_sphere
 	void modify_terrain(Vector3 global_position, bool is_subtract = false);
-	void modify_chunk(ChunkData* source_chunk, const TerrainModification& modification);
+	void modify_chunk(const ChunkData* source_chunk, const TerrainModification& modification);
 
 	std::weak_ptr<ConcurrentChunkMap> get_chunk_map() const { return chunk_map; }
 	int64_t get_pending_chunks_count() const { return chunk_generator_pool.is_valid() ? chunk_generator_pool->get_task_count() : 0; }
@@ -102,10 +102,10 @@ private:
 	std::vector<MeshData> mesh_datas{};
 	std::vector<CollisionData> collision_datas{};
 
-	using ChunkGeneratorPool = ThreadPool<ChunkGenerator, ChunkData*, ChunkData*>;
+	using ChunkGeneratorPool = ThreadPool<ChunkGenerator, ChunkPtr, ChunkPtr>;
 	Ref<ChunkGeneratorPool> chunk_generator_pool;
 
-	using MeshGeneratorPool = ThreadPool<MeshGenerator, ChunkData*, MeshData>;
+	using MeshGeneratorPool = ThreadPool<MeshGenerator, const ChunkData*, MeshData>;
 	Ref<MeshGeneratorPool> mesh_generator_pool;
 
 	using CollisionGeneratorPool = ThreadPool<CollisionGenerator, MeshData, CollisionData>;

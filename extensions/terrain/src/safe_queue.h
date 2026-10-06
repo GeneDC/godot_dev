@@ -23,17 +23,17 @@ public:
 		semaphore.instantiate();
 	}
 
-	void push(T value, bool prioritise = false)
+	void push(T&& value, bool prioritise = false)
 	{
 		mutex->lock();
 		std::deque<T>& target_queue = prioritise ? priority_queue : queue;
-		target_queue.push_back(value);
+		target_queue.push_back(std::move(value));
 		mutex->unlock();
 
 		semaphore->post();
 	}
 
-	void push(const std::vector<T>& values, bool prioritise = false)
+	void push(std::vector<T>&& values, bool prioritise = false)
 	{
 		if (values.empty()) return;
 		const uint32_t count = static_cast<uint32_t>(values.size());

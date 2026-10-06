@@ -164,7 +164,7 @@ bool MeshGenerator::init()
 	return true;
 }
 
-MeshData MeshGenerator::process_task(ChunkData* chunk_data)
+MeshData MeshGenerator::process_task(const ChunkData* chunk_data)
 {
 	MeshData mesh_data{};
 	mesh_data.chunk_pos = chunk_data->position;

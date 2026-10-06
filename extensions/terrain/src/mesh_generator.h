@@ -29,7 +29,7 @@ struct MeshData
 	uint32_t revision{ 0 };
 };
 
-class MeshGenerator final : public ITaskProcessor<ChunkData*, MeshData>
+class MeshGenerator final : public ITaskProcessor<const ChunkData*, MeshData>
 {
 	GDCLASS(MeshGenerator, RefCounted)
 
@@ -47,7 +47,7 @@ public:
 		return mesh_generator;
 	}
 
-	virtual MeshData process_task(ChunkData* chunk_data) override;
+	virtual MeshData process_task(const ChunkData* chunk_data) override;
 
 protected:
 	static void _bind_methods() {};

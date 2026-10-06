@@ -85,6 +85,7 @@ public:
 		}
 	}
 
+	// TODO: either use or remove the dirty list from here. Currently the chunk is just queued for meshing externally after calling publish_chunk
 	std::vector<Vector3i> consume_dirty_list()
 	{
 		std::lock_guard lock(dirty_mutex);
@@ -95,7 +96,7 @@ public:
 
 	// Returns a COPY of the data so the map can be unlocked immediately
 	// It's quick as the chunk uses a pointer for it's data
-	ChunkData* get_chunk(Vector3i pos)
+	const ChunkData* get_chunk(Vector3i pos)
 	{
 		MapShard& shard = map_shards[get_shard(pos)];
 		std::shared_lock lock(shard.mutex);
@@ -108,9 +109,9 @@ public:
 		return nullptr;
 	}
 
-	ChunkData* get_or_create(Vector3i pos)
+	const ChunkData* get_or_create(Vector3i pos)
 	{
-		if (ChunkData* existing_chunk = get_chunk(pos))
+		if (const ChunkData* existing_chunk = get_chunk(pos))
 		{
 			return existing_chunk;
 		}
@@ -137,12 +138,15 @@ public:
 		return shard.data.contains(pos);
 	}
 
+	// Returns a chunk from the pool, ready to be modified on the heap
 	ChunkPtr acquire_chunk(Vector3i pos)
 	{
-		return pool_shards[get_shard(pos)].pool->acquire();
+		ChunkPtr chunk_ptr = pool_shards[get_shard(pos)].pool->acquire();
+		chunk_ptr->position = pos;
+		return std::move(chunk_ptr);
 	}
 
-	ChunkData* publish_chunk(ChunkPtr new_ptr, bool mark_dirty = true)
+	const ChunkData* publish_chunk(ChunkPtr new_ptr, bool mark_dirty = true)
 	{
 		const Vector3i pos = new_ptr->position;
 		const int64_t shard_idx = get_shard(pos);

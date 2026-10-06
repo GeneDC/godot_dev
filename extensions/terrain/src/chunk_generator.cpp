@@ -15,11 +15,12 @@
 #include <godot_cpp/variant/vector2i.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
-#include <tracy/Tracy.hpp>
 
 #include <cstdint>
 #include <iterator>
 #include <list>
+#include <tracy/Tracy.hpp>
+#include <utility>
 
 using namespace godot;
 using namespace terrain_constants;
@@ -43,24 +44,24 @@ void ChunkGeneratorSettings::_bind_methods()
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "height_multiplier_noise", PROPERTY_HINT_RESOURCE_TYPE, "FastNoiseLite"), "set_height_multiplier_noise", "get_height_multiplier_noise");
 }
 
-ChunkData* ChunkGenerator::process_task(ChunkData* chunk_data)
+ChunkPtr ChunkGenerator::process_task(ChunkPtr chunk_ptr)
 {
 	// NOTE: this currently generates a chunk size + 1 array, but a chunk only needs the chunk size data and the extra data can be added before it's sent to the shader
 
 	ZoneScopedN("Generate Chunk Data");
 
-	chunk_data->surface_sum = 0;
-	chunk_data->revision++;
+	chunk_ptr->surface_sum = 0;
+	chunk_ptr->revision++;
 
-	Vector3 chunk_world_pos = chunk_data->position * CHUNK_SIZE;
+	Vector3 chunk_world_pos = chunk_ptr->position * CHUNK_SIZE;
 	bool did_generate_height_map = generate_height_map(chunk_world_pos);
 	if (!did_generate_height_map)
 	{
-		chunk_data->surface_state = SurfaceState::EMPTY;
-		return chunk_data;
+		chunk_ptr->surface_state = SurfaceState::EMPTY;
+		return std::move(chunk_ptr);
 	}
 	const float* height_map_ptr = tl_height_map->data.data();
-	uint8_t* points_ptr = chunk_data->points.data();
+	uint8_t* points_ptr = chunk_ptr->points.data();
 
 	for (int z = 0; z < POINTS_SIZE; z++)
 	{
@@ -80,26 +81,26 @@ ChunkData* ChunkGenerator::process_task(ChunkData* chunk_data)
 				//value = CLAMP(value - density, 0.0f, 1.0f);
 
 				uint8_t int_value = static_cast<uint8_t>(value * 255.0f + 0.5f);
-				chunk_data->surface_sum += int_value;
+				chunk_ptr->surface_sum += int_value;
 				points_ptr[x + y * POINTS_SIZE + z * POINTS_AREA] = int_value;
 			}
 		}
 	}
 
-	if (chunk_data->surface_sum == 0)
+	if (chunk_ptr->surface_sum == 0)
 	{
-		chunk_data->surface_state = SurfaceState::EMPTY;
+		chunk_ptr->surface_state = SurfaceState::EMPTY;
 	}
-	else if (chunk_data->surface_sum == POINTS_VOLUME)
+	else if (chunk_ptr->surface_sum == POINTS_VOLUME)
 	{
-		chunk_data->surface_state = SurfaceState::FULL;
+		chunk_ptr->surface_state = SurfaceState::FULL;
 	}
 	else
 	{
-		chunk_data->surface_state = SurfaceState::MIXED;
+		chunk_ptr->surface_state = SurfaceState::MIXED;
 	}
 
-	return chunk_data;
+	return std::move(chunk_ptr);
 }
 
 thread_local float ChunkGenerator::uint8_to_float[256];

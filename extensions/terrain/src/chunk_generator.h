@@ -53,7 +53,7 @@ protected:
 	void set_height_multiplier_noise(Ref<FastNoiseLite> p_height_multiplier_noise) { height_multiplier_noise = p_height_multiplier_noise; }
 };
 
-class ChunkGenerator final : public ITaskProcessor<ChunkData*, ChunkData*>
+class ChunkGenerator final : public ITaskProcessor<ChunkPtr, ChunkPtr>
 {
 	GDCLASS(ChunkGenerator, RefCounted)
 
@@ -74,7 +74,7 @@ public:
 		return chunk_generator;
 	}
 
-	virtual ChunkData* process_task(ChunkData* chunk_data) override;
+	virtual ChunkPtr process_task(ChunkPtr chunk_ptr) override;
 
 protected:
 	static void _bind_methods() {}
