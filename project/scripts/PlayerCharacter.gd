@@ -55,11 +55,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		process_mouse_button(event as InputEventMouseButton)
 
 func process_mouse_button(mouse_button: InputEventMouseButton) -> void:
+	if not mouse_button.pressed:                                                                                                                                                                                              
+		return 
+	
 	match mouse_button.button_index:
 		MOUSE_BUTTON_LEFT:
-			modify_terrain()
+			modify_terrain(true)
+		MOUSE_BUTTON_RIGHT:                                                                                                                                                                                                   
+			modify_terrain(false) 
 
-func modify_terrain() -> void:
+func modify_terrain(is_subtract: bool = true) -> void:
 	if (not look_raycast):
 		return
 
@@ -71,7 +76,7 @@ func modify_terrain() -> void:
 
 	var chunk_loader := GlobalChunkLoader as ChunkLoader
 	if (chunk_loader):
-		chunk_loader.modify_terrain(target_pos, true)
+		chunk_loader.modify_terrain(target_pos, is_subtract)
 
 func process_mouse_input(mouse_motion: InputEventMouseMotion) -> void:
 	# Rotate the whole character body left/right (Y-axis)
