@@ -35,7 +35,6 @@
 #include <godot_cpp/variant/variant.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
-#include <tracy/Tracy.hpp>
 
 #include <algorithm>
 #include <chunk.h>
@@ -43,6 +42,7 @@
 #include <cstdio>
 #include <iterator>
 #include <memory>
+#include <tracy/Tracy.hpp>
 #include <utility>
 #include <vector>
 
@@ -351,7 +351,6 @@ void ChunkLoader::try_update_chunks()
 		return;
 	}
 
-
 	// Check if the current update chunks task has completed before trying to start another
 	if (update_chunks_task_id != WorkerThreadPool::INVALID_TASK_ID)
 	{
@@ -527,75 +526,102 @@ void ChunkLoader::unload_all()
 
 void ChunkLoader::modify_terrain(Vector3 global_position, bool is_subtract)
 {
-	Vector3i chunk_pos = Vector3i(
-			(int)Math::floor(global_position.x / CHUNK_SIZE),
-			(int)Math::floor(global_position.y / CHUNK_SIZE),
-			(int)Math::floor(global_position.z / CHUNK_SIZE));
-	ChunkData* chunk_data = chunk_map->get_chunk(chunk_pos);
-	if (!chunk_data)
+	constexpr float radius{ 3.0f };
+
+	const Vector3 min_bounds{ global_position - Vector3(radius, radius, radius) };
+	const Vector3 max_bounds{ global_position + Vector3(radius, radius, radius) };
+
+	const Vector3i min_chunk(
+			static_cast<int>(Math::floor(min_bounds.x / CHUNK_SIZE)),
+			static_cast<int>(Math::floor(min_bounds.y / CHUNK_SIZE)),
+			static_cast<int>(Math::floor(min_bounds.z / CHUNK_SIZE)));
+
+	// + 1 to handle edge voxel overlap chunks
+	const Vector3i max_chunk(
+			static_cast<int>(Math::floor(max_bounds.x / CHUNK_SIZE)) + 1,
+			static_cast<int>(Math::floor(max_bounds.y / CHUNK_SIZE)) + 1,
+			static_cast<int>(Math::floor(max_bounds.z / CHUNK_SIZE)) + 1);
+
+	for (int cz = min_chunk.z; cz <= max_chunk.z; ++cz)
 	{
-		PRINT_ERROR("can't find chunk for modification!");
-		return;
-	}
-
-	// TODO: Find/Load and Modify the surrounding chunks
-
-	if (is_subtract && chunk_data->surface_state == SurfaceState::EMPTY)
-	{
-		return;
-	}
-	if (!is_subtract && chunk_data->surface_state == SurfaceState::FULL)
-	{
-		return;
-	}
-
-	chunk_data->revision++;
-
-	Vector3 position;
-	position.x = global_position.x - (float)(chunk_pos.x * CHUNK_SIZE);
-	position.y = global_position.y - (float)(chunk_pos.y * CHUNK_SIZE);
-	position.z = global_position.z - (float)(chunk_pos.z * CHUNK_SIZE);
-
-	float radius = 3;
-	float radius_sqr = radius * radius;
-
-	// Determine local bounds
-	int x_min = CLAMP((int)Math::floor(position.x - radius), 0, POINTS_SIZE - 1);
-	int x_max = CLAMP((int)Math::floor(position.x + radius), 0, POINTS_SIZE - 1);
-	int y_min = CLAMP((int)Math::floor(position.y - radius), 0, POINTS_SIZE - 1);
-	int y_max = CLAMP((int)Math::floor(position.y + radius), 0, POINTS_SIZE - 1);
-	int z_min = CLAMP((int)Math::floor(position.z - radius), 0, POINTS_SIZE - 1);
-	int z_max = CLAMP((int)Math::floor(position.z + radius), 0, POINTS_SIZE - 1);
-
-	for (int z = z_min; z <= z_max; ++z)
-	{
-		for (int y = y_min; y <= y_max; ++y)
+		for (int cy = min_chunk.y; cy <= max_chunk.y; ++cy)
 		{
-			for (int x = x_min; x <= x_max; ++x)
+			for (int cx = min_chunk.x; cx <= max_chunk.x; ++cx)
 			{
-				int index = x + (y * POINTS_SIZE) + (z * POINTS_AREA);
-
-				// Sphere distance check
-				Vector3 voxel_pos(x, y, z);
-				float dist_sqr = voxel_pos.distance_squared_to(position);
-				if (dist_sqr <= radius_sqr)
+				const Vector3i current_chunk_pos(cx, cy, cz);
+				ChunkData* chunk_data = chunk_map->get_chunk(current_chunk_pos);
+				if (!chunk_data)
 				{
-					uint8_t old_value = chunk_data->points[index];
-					uint8_t new_value = is_subtract ? 0 : 255;
+					continue;
+				}
+				TerrainModification modification{
+					global_position,
+					is_subtract,
+					radius
+				};
+				modify_chunk(chunk_data, modification);
+			}
+		}
+	}
+}
 
-					chunk_data->surface_sum += new_value - old_value;
+void ChunkLoader::modify_chunk(ChunkData* chunk_data, const TerrainModification& modification)
+{
+	const float radius{ modification.size };
+	const float radius_sqr{ radius * radius };
 
-					chunk_data->points[index] = new_value;
+	const Vector3 chunk_world_origin(
+			static_cast<float>(chunk_data->position.x * CHUNK_SIZE),
+			static_cast<float>(chunk_data->position.y * CHUNK_SIZE),
+			static_cast<float>(chunk_data->position.z * CHUNK_SIZE));
+	const Vector3 position{ modification.global_position - chunk_world_origin };
+
+	const Vector3i min(
+			CLAMP(static_cast<int>(Math::floor(position.x - radius)), 0, POINTS_SIZE - 1),
+			CLAMP(static_cast<int>(Math::floor(position.y - radius)), 0, POINTS_SIZE - 1),
+			CLAMP(static_cast<int>(Math::floor(position.z - radius)), 0, POINTS_SIZE - 1));
+	const Vector3i max(
+			CLAMP(static_cast<int>(Math::floor(position.x + radius)), 0, POINTS_SIZE - 1),
+			CLAMP(static_cast<int>(Math::floor(position.y + radius)), 0, POINTS_SIZE - 1),
+			CLAMP(static_cast<int>(Math::floor(position.z + radius)), 0, POINTS_SIZE - 1));
+
+	bool was_modified{ false };
+	for (int z = min.z; z <= max.z; ++z)
+	{
+		for (int y = min.y; y <= max.y; ++y)
+		{
+			for (int x = min.x; x <= max.x; ++x)
+			{
+				if (Vector3(x, y, z).distance_squared_to(position) > radius_sqr)
+				{
+					continue;
+				}
+
+				const int index{ x + (y * POINTS_SIZE) + (z * POINTS_AREA) };
+				const uint8_t old_val{ chunk_data->points[index] };
+				const uint8_t new_val{ modification.is_subtract ? 0u : 255u };
+
+				if (old_val != new_val)
+				{
+					chunk_data->surface_sum += new_val - old_val;
+					chunk_data->points[index] = new_val;
+					was_modified = true;
 				}
 			}
 		}
 	}
 
+	if (!was_modified)
+	{
+		return;
+	}
+
+	chunk_data->revision++;
 	if (chunk_data->surface_sum == 0)
 	{
 		chunk_data->surface_state = SurfaceState::EMPTY;
 	}
-	else if (chunk_data->surface_sum == (float)POINTS_VOLUME)
+	else if (chunk_data->surface_sum == static_cast<float>(POINTS_VOLUME))
 	{
 		chunk_data->surface_state = SurfaceState::FULL;
 	}
