@@ -137,6 +137,8 @@ foreach(dir ${extension_dirs})
 				
 				target_compile_definitions(${ext_name} PRIVATE
 					TRACY_ENABLE
+					TRACY_DELAYED_INIT
+					TRACY_MANUAL_LIFETIME
 				)
 				
 				target_sources(${ext_name} PRIVATE "${TRACY_DIR}/public/TracyClient.cpp")

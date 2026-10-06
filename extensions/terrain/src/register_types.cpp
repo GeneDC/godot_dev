@@ -9,20 +9,29 @@
 #include "terrain_performance_monitor.h"
 #include "thread_pool.h"
 
+#include <client/TracyProfiler.hpp>
+#include <gdextension_interface.h>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/defs.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/godot.hpp>
 
-#include <gdextension_interface.h>
 
 using namespace godot;
 
 static TerrainPerformanceMonitor* _terrain_performance_monitor_instance = nullptr;
 
-void initialize_gdextension_types(ModuleInitializationLevel p_level)
+static void initialize_gdextension_types(ModuleInitializationLevel p_level)
 {
-	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE)
+	if (p_level == MODULE_INITIALIZATION_LEVEL_CORE)
+	{
+#ifdef TRACY_MANUAL_LIFETIME
+		// Use manual tracy lifetime to prevent it from hanging the app on shutdown.
+		// Look into a different approach if adding tracy to more extensions.
+		tracy::StartupProfiler();
+#endif
+	}
+	else if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE)
 	{
 		GDREGISTER_CLASS(TerrainPerformanceMonitor)
 		_terrain_performance_monitor_instance = memnew(TerrainPerformanceMonitor);
@@ -43,18 +52,21 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 	GDREGISTER_CLASS(ThreadPoolBase)
 }
 
-void uninitialize_gdextension_types(ModuleInitializationLevel p_level)
+static void uninitialize_gdextension_types(ModuleInitializationLevel p_level)
 {
-	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE)
+	if (p_level == MODULE_INITIALIZATION_LEVEL_CORE)
+	{
+#ifdef TRACY_MANUAL_LIFETIME
+		tracy::ShutdownProfiler();
+#endif
+	}
+	else if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE)
 	{
 		_terrain_performance_monitor_instance->uninitialize();
 		memdelete(_terrain_performance_monitor_instance);
 		_terrain_performance_monitor_instance = nullptr;
 	}
-	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE)
-	{
-		return;
-	}
+
 }
 
 extern "C"
