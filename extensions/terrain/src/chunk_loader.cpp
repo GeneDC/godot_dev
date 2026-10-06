@@ -570,6 +570,7 @@ void ChunkLoader::modify_chunk(ChunkData* chunk_data, const TerrainModification&
 	const float radius{ modification.size };
 	constexpr float half_band{ 1.5f }; // Half-width of transition band in voxels
 	const float outer_radius{ radius + half_band };
+	const float outer_radius_sqr{ outer_radius * outer_radius };
 	constexpr float iso_level{ 128.0f };
 	constexpr float density_scale{ 255.0f / (2.0f * half_band) };
 
@@ -591,23 +592,31 @@ void ChunkLoader::modify_chunk(ChunkData* chunk_data, const TerrainModification&
 	bool was_modified{ false };
 	for (int z = min.z; z <= max.z; ++z)
 	{
+		const float distance_z = static_cast<float>(z) - position.z;
+		const float distance_z_sqr = distance_z * distance_z;
+		if (distance_z_sqr > outer_radius_sqr) continue;
+
 		for (int y = min.y; y <= max.y; ++y)
 		{
-			for (int x = min.x; x <= max.x; ++x)
-			{
-				// Don't use squared distance as we need the distance later
-				const float distance_to_point = Vector3(x, y, z).distance_to(position);
-				if (distance_to_point > outer_radius)
-				{
-					continue;
-				}
+			const float distance_y = static_cast<float>(y) - position.y;
+			const float distance_yz_sqr = distance_z_sqr + (distance_y * distance_y);
+			if (distance_yz_sqr > outer_radius_sqr) continue;
 
+			// Solve tight X span inside the circle slice
+			const float x_span = Math::sqrt(outer_radius_sqr - distance_yz_sqr);
+			const int row_x_min = CLAMP(static_cast<int>(Math::floor(position.x - x_span)), 0, POINTS_SIZE - 1);
+			const int row_x_max = CLAMP(static_cast<int>(Math::floor(position.x + x_span)), 0, POINTS_SIZE - 1);
+
+			int index = row_x_min + (y * POINTS_SIZE) + (z * POINTS_AREA);
+			for (int x = row_x_min; x <= row_x_max; ++x, ++index)
+			{
+				const float distance_x = static_cast<float>(x) - position.x;
+				const float distance_to_point = Math::sqrt(distance_yz_sqr + (distance_x * distance_x));
 				const float signed_distance = distance_to_point - radius;
 				// Map signed distance to [0, 255] where signed_dist == 0 is exactly iso_level
 				const float unclamped_density = iso_level - (signed_distance * density_scale);
 				const uint8_t target_density = static_cast<uint8_t>(Math::clamp(unclamped_density, 0.0f, 255.0f));
 
-				const int index{ x + (y * POINTS_SIZE) + (z * POINTS_AREA) };
 				const uint8_t old_val{ chunk_data->points[index] };
 				const uint8_t new_val{
 					modification.is_subtract ? std::min(old_val, static_cast<uint8_t>(255u - target_density)) : std::max(old_val, target_density)
