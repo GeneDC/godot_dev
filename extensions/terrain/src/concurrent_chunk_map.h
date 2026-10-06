@@ -137,29 +137,28 @@ public:
 		return shard.data.contains(pos);
 	}
 
-	void update_chunk(const ChunkData& modified_data, bool mark_dirty = true)
+	ChunkPtr acquire_chunk(Vector3i pos)
 	{
-		int64_t shard_idx = get_shard(modified_data.position);
+		return pool_shards[get_shard(pos)].pool->acquire();
+	}
 
-		// Create the new ptr before locking
-		PoolShard& pool_shard = pool_shards[shard_idx];
-		ChunkPtr new_ptr = pool_shard.pool->acquire();
+	ChunkData* publish_chunk(ChunkPtr new_ptr, bool mark_dirty = true)
+	{
+		const Vector3i pos = new_ptr->position;
+		const int64_t shard_idx = get_shard(pos);
 
-		// Shallow copy
-		*new_ptr = modified_data;
-
+		ChunkData* result = new_ptr.get();
 		{
 			MapShard& shard = map_shards[shard_idx];
 			std::unique_lock lock(shard.mutex);
-			// This replaces the ChunkPtr. It returns to the pool automatically.
-			shard.data[modified_data.position] = std::move(new_ptr);
+			shard.data[pos] = std::move(new_ptr);
 		}
-
 		if (mark_dirty)
 		{
 			std::lock_guard lock(dirty_mutex);
-			dirty_positions.insert(modified_data.position);
+			dirty_positions.insert(pos);
 		}
+		return result;
 	}
 
 	void unload_chunk(Vector3i pos)
@@ -168,7 +167,6 @@ public:
 		std::unique_lock lock(shard.mutex);
 		shard.data.erase(pos);
 	}
-
 
 	void unload_all()
 	{

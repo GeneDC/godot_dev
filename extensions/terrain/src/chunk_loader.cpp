@@ -565,8 +565,11 @@ void ChunkLoader::modify_terrain(Vector3 global_position, bool is_subtract)
 	}
 }
 
-void ChunkLoader::modify_chunk(ChunkData* chunk_data, const TerrainModification& modification)
+void ChunkLoader::modify_chunk(ChunkData* source_chunk_data, const TerrainModification& modification)
 {
+	ChunkPtr modified_chunk_data = chunk_map->acquire_chunk(source_chunk_data->position);
+	*modified_chunk_data = *source_chunk_data; // Copies the source data to the newly acquired chunk ptr
+
 	const float radius{ modification.size };
 	constexpr float half_band{ 1.5f }; // Half-width of transition band in voxels
 	const float outer_radius{ radius + half_band };
@@ -575,9 +578,9 @@ void ChunkLoader::modify_chunk(ChunkData* chunk_data, const TerrainModification&
 	constexpr float density_scale{ 255.0f / (2.0f * half_band) };
 
 	const Vector3 chunk_world_origin(
-			static_cast<float>(chunk_data->position.x * CHUNK_SIZE),
-			static_cast<float>(chunk_data->position.y * CHUNK_SIZE),
-			static_cast<float>(chunk_data->position.z * CHUNK_SIZE));
+			static_cast<float>(modified_chunk_data->position.x * CHUNK_SIZE),
+			static_cast<float>(modified_chunk_data->position.y * CHUNK_SIZE),
+			static_cast<float>(modified_chunk_data->position.z * CHUNK_SIZE));
 	const Vector3 position{ modification.global_position - chunk_world_origin };
 
 	const Vector3i min(
@@ -617,15 +620,15 @@ void ChunkLoader::modify_chunk(ChunkData* chunk_data, const TerrainModification&
 				const float unclamped_density = iso_level - (signed_distance * density_scale);
 				const uint8_t target_density = static_cast<uint8_t>(Math::clamp(unclamped_density, 0.0f, 255.0f));
 
-				const uint8_t old_val{ chunk_data->points[index] };
+				const uint8_t old_val{ modified_chunk_data->points[index] };
 				const uint8_t new_val{
 					modification.is_subtract ? std::min(old_val, static_cast<uint8_t>(255u - target_density)) : std::max(old_val, target_density)
 				};
 
 				if (old_val != new_val)
 				{
-					chunk_data->surface_sum += new_val - old_val;
-					chunk_data->points[index] = new_val;
+					modified_chunk_data->surface_sum += new_val - old_val;
+					modified_chunk_data->points[index] = new_val;
 					was_modified = true;
 				}
 			}
@@ -637,21 +640,22 @@ void ChunkLoader::modify_chunk(ChunkData* chunk_data, const TerrainModification&
 		return;
 	}
 
-	chunk_data->revision++;
-	if (chunk_data->surface_sum == 0)
+	modified_chunk_data->revision++;
+	if (modified_chunk_data->surface_sum == 0)
 	{
-		chunk_data->surface_state = SurfaceState::EMPTY;
+		modified_chunk_data->surface_state = SurfaceState::EMPTY;
 	}
-	else if (chunk_data->surface_sum == static_cast<float>(POINTS_VOLUME))
+	else if (modified_chunk_data->surface_sum == static_cast<float>(POINTS_VOLUME))
 	{
-		chunk_data->surface_state = SurfaceState::FULL;
+		modified_chunk_data->surface_state = SurfaceState::FULL;
 	}
 	else
 	{
-		chunk_data->surface_state = SurfaceState::MIXED;
+		modified_chunk_data->surface_state = SurfaceState::MIXED;
 	}
 
-	mesh_generator_pool->queue_task(chunk_data, true);
+	ChunkData* new_chunk_data = chunk_map->publish_chunk(std::move(modified_chunk_data));
+	mesh_generator_pool->queue_task(new_chunk_data, true);
 }
 
 Chunk* ChunkLoader::get_or_create_chunk_node(Vector3i chunk_pos)

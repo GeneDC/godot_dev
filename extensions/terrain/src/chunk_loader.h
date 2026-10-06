@@ -62,7 +62,7 @@ public:
 
 	// TODO: Rename to modify_terrain_sphere
 	void modify_terrain(Vector3 global_position, bool is_subtract = false);
-	void modify_chunk(ChunkData* chunk_data, const TerrainModification& modification);
+	void modify_chunk(ChunkData* source_chunk, const TerrainModification& modification);
 
 	std::weak_ptr<ConcurrentChunkMap> get_chunk_map() const { return chunk_map; }
 	int64_t get_pending_chunks_count() const { return chunk_generator_pool.is_valid() ? chunk_generator_pool->get_task_count() : 0; }
