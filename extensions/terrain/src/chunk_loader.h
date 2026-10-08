@@ -62,8 +62,7 @@ public:
 
 	State get_state() const { return state; }
 
-	// TODO: Rename to modify_terrain_sphere
-	void modify_terrain(Vector3 global_position, bool is_subtract = false);
+	void modify_terrain_sphere(Vector3 global_position, float radius = 3.0f, bool is_subtract = false);
 	void modify_chunk(const ChunkData* source_chunk, const TerrainModification& modification);
 
 	std::weak_ptr<ConcurrentChunkMap> get_chunk_map() const { return chunk_map; }

@@ -96,7 +96,7 @@ func modify_terrain(is_subtract: bool = true) -> void:
 
 	var chunk_loader := GlobalChunkLoader as ChunkLoader
 	if (chunk_loader):
-		chunk_loader.modify_terrain(target_pos, is_subtract)
+		chunk_loader.modify_terrain_sphere(target_pos, 2.0, is_subtract)
 
 func process_mouse_input(mouse_motion: InputEventMouseMotion) -> void:
 	# Rotate the whole character body left/right (Y-axis)

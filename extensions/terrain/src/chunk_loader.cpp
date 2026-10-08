@@ -64,7 +64,7 @@ void ChunkLoader::_bind_methods()
 	ClassDB::bind_method(D_METHOD("can_update"), &ChunkLoader::can_update);
 	ClassDB::bind_method(D_METHOD("can_stop"), &ChunkLoader::can_stop);
 
-	ClassDB::bind_method(D_METHOD("modify_terrain", "global_position", "is_subtract"), &ChunkLoader::modify_terrain);
+	ClassDB::bind_method(D_METHOD("modify_terrain_sphere", "global_position", "radius", "is_subtract"), &ChunkLoader::modify_terrain_sphere);
 
 	ClassDB::bind_method(D_METHOD("get_chunk_viewer"), &ChunkLoader::get_chunk_viewer);
 	ClassDB::bind_method(D_METHOD("set_chunk_viewer", "chunk_viewer"), &ChunkLoader::set_chunk_viewer);
@@ -544,10 +544,8 @@ void ChunkLoader::unload_all()
 	}
 }
 
-void ChunkLoader::modify_terrain(Vector3 global_position, bool is_subtract)
+void ChunkLoader::modify_terrain_sphere(Vector3 global_position, float radius, bool is_subtract)
 {
-	constexpr float radius{ 3.0f };
-
 	const Vector3 min_bounds{ global_position - Vector3(radius, radius, radius) };
 	const Vector3 max_bounds{ global_position + Vector3(radius, radius, radius) };
 
