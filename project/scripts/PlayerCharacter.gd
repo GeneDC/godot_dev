@@ -16,6 +16,12 @@ var is_gravity_on := true
 var pressed_jump := false
 var input_dir := Vector2()
 
+func _init() -> void:
+	# Setup default mouse mode settings
+	var settings := ViewSettingsComponent.new()
+	settings.default_mouse_mode = Input.MOUSE_MODE_CAPTURED
+	add_child(settings)
+
 func _ready() -> void:
 	if not preview_marker:
 		preview_marker = MeshInstance3D.new()
@@ -40,7 +46,21 @@ func _process(_dt: float) -> void:
 		preview_marker.position = target_pos
 
 func _unhandled_input(event: InputEvent) -> void:
-	if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED and (event is InputEventMouseMotion):
+	if (Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED):
+		
+		# Left click to get first person control back
+		if (event is InputEventMouseButton):
+			var mouse_button := event as InputEventMouseButton
+			if (mouse_button.button_index == MOUSE_BUTTON_LEFT):
+				Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+		
+		return # Don't do any player character input if we haven't captured the mouse 
+	
+	# esc to get mouse cursor back
+	if (event.is_action_pressed("ui_cancel")):
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	
+	if (event is InputEventMouseMotion):
 		process_mouse_input(event as InputEventMouseMotion)
 
 	if Input.is_action_just_pressed("toggle_gravity"):
@@ -55,14 +75,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		process_mouse_button(event as InputEventMouseButton)
 
 func process_mouse_button(mouse_button: InputEventMouseButton) -> void:
-	if not mouse_button.pressed:                                                                                                                                                                                              
-		return 
+	if not mouse_button.pressed:
+		return
 	
 	match mouse_button.button_index:
 		MOUSE_BUTTON_LEFT:
 			modify_terrain(true)
-		MOUSE_BUTTON_RIGHT:                                                                                                                                                                                                   
-			modify_terrain(false) 
+		MOUSE_BUTTON_RIGHT:
+			modify_terrain(false)
 
 func modify_terrain(is_subtract: bool = true) -> void:
 	if (not look_raycast):

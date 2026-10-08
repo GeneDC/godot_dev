@@ -38,7 +38,12 @@ func activate() -> void:
 			controlled_node.set_process_input(true)
 			controlled_node.set_process_unhandled_input(true)
 
-	Input.mouse_mode = mouse_mode
+	var target_mouse_mode := mouse_mode
+	if (controlled_node):
+		var view_settings: ViewSettingsComponent = controlled_node.get_node_or_null("ViewSettingsComponent")
+		if (view_settings):
+			target_mouse_mode = view_settings.default_mouse_mode
+	Input.set_mouse_mode(target_mouse_mode)
 
 func deactivate() -> void:
 	is_active = false

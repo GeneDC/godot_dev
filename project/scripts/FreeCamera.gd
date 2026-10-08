@@ -27,6 +27,12 @@ var _e := false
 var _shift := false
 var _alt := false
 
+func _init() -> void:
+	# Setup default mouse mode settings
+	var settings := ViewSettingsComponent.new()
+	settings.default_mouse_mode = Input.MOUSE_MODE_VISIBLE
+	add_child(settings)
+
 func spawn_sphere() -> void:
 	var mesh_instance := MeshInstance3D.new()
 	var sphere_mesh := SphereMesh.new()
