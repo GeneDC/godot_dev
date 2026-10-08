@@ -53,7 +53,7 @@ private:
 	struct MapShard
 	{
 		std::unordered_map<Vector3i, ChunkPtr, Vector3iHasher> data;
-		mutable std::shared_mutex mutex; // TODO Replace all std::mutex with godot::Mutex for better engine stability and cross-platform support.
+		mutable std::shared_mutex mutex;
 	};
 
 	std::vector<MapShard> map_shards;
