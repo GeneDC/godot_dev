@@ -146,16 +146,16 @@ public:
 		return std::move(chunk_ptr);
 	}
 
-	const ChunkData* publish_chunk(ChunkPtr new_ptr, bool mark_dirty = true)
+	const ChunkData* publish_chunk(ChunkPtr new_chunk_ptr, bool mark_dirty = true)
 	{
-		const Vector3i pos = new_ptr->position;
+		const Vector3i pos = new_chunk_ptr->position;
 		const int64_t shard_idx = get_shard(pos);
 
-		ChunkData* result = new_ptr.get();
+		ChunkData* result = new_chunk_ptr.get();
 		{
 			MapShard& shard = map_shards[shard_idx];
 			std::unique_lock lock(shard.mutex);
-			shard.data[pos] = std::move(new_ptr);
+			shard.data[pos] = std::move(new_chunk_ptr);
 		}
 		if (mark_dirty)
 		{

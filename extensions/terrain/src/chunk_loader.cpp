@@ -45,6 +45,9 @@
 #include <tracy/Tracy.hpp>
 #include <utility>
 #include <vector>
+#include <godot_cpp/classes/object.hpp>
+#include "chunk_viewer.h"
+#include <godot_cpp/core/object_id.hpp>
 
 using namespace godot;
 using namespace terrain_constants;
@@ -96,6 +99,7 @@ bool ChunkLoader::init()
 		return false;
 	}
 
+	ChunkViewer* chunk_viewer = get_chunk_viewer();
 	if (!chunk_viewer)
 	{
 		PRINT_ERROR("chunk_viewer not set!");
@@ -220,6 +224,7 @@ void ChunkLoader::update()
 					std::make_move_iterator(done_mesh_datas.begin()),
 					std::make_move_iterator(done_mesh_datas.end()));
 
+			ChunkViewer* chunk_viewer = get_chunk_viewer();
 			Vector3 centre_pos = chunk_viewer->get_current_chunk_pos();
 			uint64_t count = std::min<uint64_t>(mesh_datas.size(), 10); // It's unlikely we'll process more than 10, so only sort that many
 			// Sort x closest positions to the back, using reverse iterators
@@ -274,6 +279,7 @@ void ChunkLoader::update()
 					std::make_move_iterator(done_collision_datas.begin()),
 					std::make_move_iterator(done_collision_datas.end()));
 
+			ChunkViewer* chunk_viewer = get_chunk_viewer();
 			Vector3 centre_pos = chunk_viewer->get_current_chunk_pos();
 			uint64_t count = std::min<uint64_t>(collision_datas.size(), 10); // It's unlikely we'll process more than 10, so only sort that many
 			// Sort x closest positions to the back, using reverse iterators
@@ -369,6 +375,7 @@ void ChunkLoader::try_update_chunks()
 
 void ChunkLoader::_update_chunks()
 {
+	ChunkViewer* chunk_viewer = get_chunk_viewer();
 	if (!chunk_viewer)
 	{
 		PRINT_ERROR("chunk_viewer not set!");
@@ -429,12 +436,14 @@ void ChunkLoader::_update_chunks()
 		chunk_datas.reserve(chunk_ptrs.size());
 		for (int i = 0; i < chunk_ptrs.size(); ++i)
 		{
-			chunk_datas.push_back(chunk_map->publish_chunk(std::move(chunk_ptrs[i])));
+			const ChunkData* chunk_data = chunk_map->publish_chunk(std::move(chunk_ptrs[i]));
+			// Ignore empty and full chunks as they don't need to be generated
+			if (chunk_data->surface_state == SurfaceState::MIXED)
+			{
+				chunk_datas.push_back(chunk_data);
+			}
 		}
 
-		// Remove empty and full chunks as they don't need to be generated
-		std::erase_if(chunk_datas, [](const ChunkData* chunk_data)
-				{ return chunk_data->surface_state != SurfaceState::MIXED; });
 		mesh_generator_pool->queue_task(std::move(chunk_datas));
 	}
 }
@@ -443,6 +452,7 @@ void ChunkLoader::update_chunk_collisions()
 {
 	ZoneScopedN("ChunkLoader::update_chunk_collisions");
 
+	ChunkViewer* chunk_viewer = get_chunk_viewer();
 	if (!chunk_viewer || !chunk_map || !collision_generator_pool.is_valid())
 	{
 		return;
@@ -528,7 +538,7 @@ void ChunkLoader::unload_all()
 	{
 		chunk_map->unload_all();
 	}
-	if (chunk_viewer)
+	if (ChunkViewer* chunk_viewer = get_chunk_viewer())
 	{
 		chunk_viewer->reset();
 	}
@@ -691,6 +701,20 @@ Chunk* ChunkLoader::get_chunk_node(Vector3i chunk_pos)
 	}
 
 	return nullptr;
+}
+
+ChunkViewer* ChunkLoader::get_chunk_viewer() const
+{
+	if (chunk_viewer_id.is_null())
+	{
+		return nullptr;
+	}
+	return Object::cast_to<ChunkViewer>(ObjectDB::get_instance(chunk_viewer_id));
+}
+
+void ChunkLoader::set_chunk_viewer(ChunkViewer* p_chunk_viewer)
+{
+	chunk_viewer_id = p_chunk_viewer ? p_chunk_viewer->get_instance_id() : ObjectID();
 }
 
 Chunk* ChunkLoader::_create_chunk_node(Vector3i chunk_pos)

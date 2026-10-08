@@ -14,6 +14,7 @@
 #include <godot_cpp/classes/standard_material3d.hpp>
 #include <godot_cpp/classes/worker_thread_pool.hpp>
 #include <godot_cpp/classes/wrapped.hpp>
+#include <godot_cpp/core/object_id.hpp>
 #include <godot_cpp/templates/hash_map.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
@@ -56,7 +57,8 @@ public:
 	bool can_stop() const { return state == State::Ready; }
 
 	Ref<ChunkGeneratorSettings> chunk_generator_settings;
-	ChunkViewer* chunk_viewer = nullptr; // TODO: Use a ObjectID instead. Using raw pointer isn't safe as it could become dangling.
+
+	ObjectID chunk_viewer_id{};
 
 	State get_state() const { return state; }
 
@@ -77,8 +79,8 @@ public:
 protected:
 	static void _bind_methods();
 
-	ChunkViewer* get_chunk_viewer() const { return chunk_viewer; }
-	void set_chunk_viewer(ChunkViewer* p_chunk_viewer) { chunk_viewer = p_chunk_viewer; }
+	ChunkViewer* get_chunk_viewer() const;
+	void set_chunk_viewer(ChunkViewer* p_chunk_viewer);
 
 	Ref<ChunkGeneratorSettings> get_chunk_generator_settings() const { return chunk_generator_settings; }
 	void set_chunk_generator_settings(Ref<ChunkGeneratorSettings> p_chunk_generator_settings) { chunk_generator_settings = p_chunk_generator_settings; }
@@ -87,7 +89,6 @@ protected:
 	void set_material(Ref<StandardMaterial3D> p_material) { material = p_material; }
 
 private:
-
 	void try_update_chunks();
 	void _update_chunks();
 	void update_chunk_collisions();
