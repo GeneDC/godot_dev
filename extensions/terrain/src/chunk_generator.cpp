@@ -91,7 +91,7 @@ ChunkPtr ChunkGenerator::process_task(ChunkPtr chunk_ptr)
 	{
 		chunk_ptr->surface_state = SurfaceState::EMPTY;
 	}
-	else if (chunk_ptr->surface_sum == POINTS_VOLUME)
+	else if (chunk_ptr->surface_sum == FULL_POINTS_SUM)
 	{
 		chunk_ptr->surface_state = SurfaceState::FULL;
 	}

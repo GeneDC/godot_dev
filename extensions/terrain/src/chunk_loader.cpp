@@ -665,7 +665,7 @@ void ChunkLoader::modify_chunk(const ChunkData* source_chunk_data, const Terrain
 	{
 		modified_chunk_data->surface_state = SurfaceState::EMPTY;
 	}
-	else if (modified_chunk_data->surface_sum == static_cast<float>(POINTS_VOLUME))
+	else if (modified_chunk_data->surface_sum == FULL_POINTS_SUM)
 	{
 		modified_chunk_data->surface_state = SurfaceState::FULL;
 	}
@@ -675,7 +675,10 @@ void ChunkLoader::modify_chunk(const ChunkData* source_chunk_data, const Terrain
 	}
 
 	const ChunkData* new_chunk_data = chunk_map->publish_chunk(std::move(modified_chunk_data));
-	mesh_generator_pool->queue_task(std::move(new_chunk_data), true);
+	if (new_chunk_data->surface_state == SurfaceState::MIXED)
+	{
+		mesh_generator_pool->queue_task(std::move(new_chunk_data), true);
+	}
 }
 
 Chunk* ChunkLoader::get_or_create_chunk_node(Vector3i chunk_pos)
