@@ -12,6 +12,7 @@
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/classes/rendering_device.hpp>
+#include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/wrapped.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/variant/rid.hpp>
@@ -20,6 +21,20 @@
 #include <cstdint>
 
 using namespace godot;
+
+class MeshGeneratorSettings : public Resource
+{
+	GDCLASS(MeshGeneratorSettings, Resource)
+
+public:
+	Ref<RDShaderFile> compute_shader_file;
+
+protected:
+	static void _bind_methods();
+
+	void set_compute_shader_file(Ref<RDShaderFile> p_compute_shader_file) { compute_shader_file = p_compute_shader_file; }
+	Ref<RDShaderFile> get_compute_shader_file() const { return compute_shader_file; }
+};
 
 struct MeshData
 {
@@ -40,9 +55,11 @@ public:
 	// Call once to setup. Creates local rendering device, loads shader, and setups the buffers and uniforms
 	bool init();
 
-	static Ref<MeshGenerator> create()
+	static Ref<MeshGenerator> create(Ref<MeshGeneratorSettings> p_settings)
 	{
 		Ref<MeshGenerator> mesh_generator = memnew((MeshGenerator));
+		mesh_generator->settings = p_settings->duplicate(true);
+
 		mesh_generator->init();
 		return mesh_generator;
 	}
@@ -53,11 +70,12 @@ protected:
 	static void _bind_methods() {};
 
 private:
+	Ref<MeshGeneratorSettings> settings{};
+
 	RenderingDevice* local_rendering_device = nullptr;
 
 	uint64_t rendering_thread_id = -1;
 
-	Ref<RDShaderFile> shader_file;
 	Ref<RDShaderSPIRV> shader_spirv;
 	RID shader;
 	RID uniform_set;

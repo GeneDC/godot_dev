@@ -48,6 +48,7 @@ static void initialize_gdextension_types(ModuleInitializationLevel p_level)
 	GDREGISTER_CLASS(ChunkLoader)
 	GDREGISTER_CLASS(ChunkViewer)
 	GDREGISTER_CLASS(CollisionGenerator)
+	GDREGISTER_CLASS(MeshGeneratorSettings)
 	GDREGISTER_CLASS(MeshGenerator)
 	GDREGISTER_CLASS(ThreadPoolBase)
 }

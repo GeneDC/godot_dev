@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://ce87b024lunif"]
 
 [ext_resource type="Material" uid="uid://dfwk5so37pjkp" path="res://Materials/ChunkMaterial.tres" id="1_t8b3n"]
+[ext_resource type="RDShaderFile" uid="uid://e5hvjescgcya" path="res://Shaders/Compute/ComputeCubes.glsl" id="1_ws15a"]
 
 [sub_resource type="FastNoiseLite" id="FastNoiseLite_wcwec"]
 
@@ -14,6 +15,10 @@ height_base_noise = SubResource("FastNoiseLite_wcwec")
 base_height_multiplier = 10.0
 height_multiplier_noise = SubResource("FastNoiseLite_ei00m")
 
+[sub_resource type="MeshGeneratorSettings" id="MeshGeneratorSettings_32eyg"]
+compute_shader_file = ExtResource("1_ws15a")
+
 [node name="ChunkLoader" type="ChunkLoader" unique_id=1645800036]
 chunk_generator_settings = SubResource("ChunkGeneratorSettings_wcwec")
+mesh_generator_settings = SubResource("MeshGeneratorSettings_32eyg")
 material = ExtResource("1_t8b3n")

@@ -5,6 +5,7 @@
 #include "terrain_constants.h"
 
 #include <godot_cpp/classes/array_mesh.hpp>
+#include <godot_cpp/classes/global_constants.hpp>
 #include <godot_cpp/classes/mesh.hpp>
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/rd_uniform.hpp>
@@ -12,11 +13,15 @@
 #include <godot_cpp/classes/rendering_device.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
+#include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/memory.hpp>
+#include <godot_cpp/core/object.hpp>
+#include <godot_cpp/core/property_info.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
+#include <godot_cpp/variant/variant.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
 
 #include <cstdint>
@@ -24,6 +29,13 @@
 
 using namespace godot;
 using namespace terrain_constants;
+
+void MeshGeneratorSettings::_bind_methods()
+{
+	ClassDB::bind_method(D_METHOD("get_compute_shader_file"), &MeshGeneratorSettings::get_compute_shader_file);
+	ClassDB::bind_method(D_METHOD("set_compute_shader_file", "shader_file"), &MeshGeneratorSettings::set_compute_shader_file);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "compute_shader_file", PROPERTY_HINT_RESOURCE_TYPE, "RDShaderFile"), "set_compute_shader_file", "get_compute_shader_file");
+}
 
 MeshGenerator::~MeshGenerator()
 {
@@ -64,22 +76,19 @@ bool MeshGenerator::init()
 		return false;
 	}
 
-	ResourceLoader* resource_loader = ResourceLoader::get_singleton();
-	if (!resource_loader)
+	if (settings.is_null())
 	{
-		PRINT_ERROR("Missing Resource Loader Singleton");
+		PRINT_ERROR("Mesh Generator settings are null");
 		return false;
 	}
 
-	// TODO: make this shader file not hard coded
-	shader_file = resource_loader->load("res://scripts/ComputeCubes.glsl");
-	if (shader_file.is_null())
+	if (settings->compute_shader_file.is_null())
 	{
 		PRINT_ERROR("Failed to load shader file");
 		return false;
 	}
 
-	shader_spirv = shader_file->get_spirv();
+	shader_spirv = settings->compute_shader_file->get_spirv();
 	shader = local_rendering_device->shader_create_from_spirv(shader_spirv);
 	if (!shader.is_valid())
 	{

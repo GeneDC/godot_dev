@@ -74,6 +74,10 @@ void ChunkLoader::_bind_methods()
 	ClassDB::bind_method(D_METHOD("set_chunk_generator_settings", "chunk_generator_settings"), &ChunkLoader::set_chunk_generator_settings);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "chunk_generator_settings", PROPERTY_HINT_RESOURCE_TYPE, "ChunkGeneratorSettings"), "set_chunk_generator_settings", "get_chunk_generator_settings");
 
+	ClassDB::bind_method(D_METHOD("get_mesh_generator_settings"), &ChunkLoader::get_mesh_generator_settings);
+	ClassDB::bind_method(D_METHOD("set_mesh_generator_settings", "mesh_generator_settings"), &ChunkLoader::set_mesh_generator_settings);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "mesh_generator_settings", PROPERTY_HINT_RESOURCE_TYPE, "MeshGeneratorSettings"), "set_mesh_generator_settings", "get_mesh_generator_settings");
+
 	ClassDB::bind_method(D_METHOD("get_material"), &ChunkLoader::get_material);
 	ClassDB::bind_method(D_METHOD("set_material", "material"), &ChunkLoader::set_material);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "material", PROPERTY_HINT_RESOURCE_TYPE, "StandardMaterial3D"), "set_material", "get_material");
@@ -121,8 +125,8 @@ bool ChunkLoader::init()
 	if (mesh_generator_pool->get_state() == ThreadPoolState::Stopped)
 	{
 		constexpr int64_t mesh_generator_thread_count = 1;
-		mesh_generator_pool->init(mesh_generator_thread_count, "", []()
-				{ return MeshGenerator::create(); });
+		mesh_generator_pool->init(mesh_generator_thread_count, "", [settings = mesh_generator_settings]()
+				{ return MeshGenerator::create(settings); });
 	}
 	else
 	{

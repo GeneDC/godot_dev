@@ -57,6 +57,7 @@ public:
 	bool can_stop() const { return state == State::Ready; }
 
 	Ref<ChunkGeneratorSettings> chunk_generator_settings;
+	Ref<MeshGeneratorSettings> mesh_generator_settings;
 
 	ObjectID chunk_viewer_id{};
 
@@ -83,6 +84,9 @@ protected:
 
 	Ref<ChunkGeneratorSettings> get_chunk_generator_settings() const { return chunk_generator_settings; }
 	void set_chunk_generator_settings(Ref<ChunkGeneratorSettings> p_chunk_generator_settings) { chunk_generator_settings = p_chunk_generator_settings; }
+
+	Ref<MeshGeneratorSettings> get_mesh_generator_settings() const { return mesh_generator_settings; }
+	void set_mesh_generator_settings(Ref<MeshGeneratorSettings> p_mesh_generator_settings) { mesh_generator_settings = p_mesh_generator_settings; }
 
 	Ref<StandardMaterial3D> get_material() const { return material; }
 	void set_material(Ref<StandardMaterial3D> p_material) { material = p_material; }
