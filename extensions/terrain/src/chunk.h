@@ -24,6 +24,13 @@ public:
 	~Chunk();
 
 	virtual void _ready() override;
+
+	void reset_state();
+
+	// NodePool Support
+	void on_pool_acquire();
+	void on_pool_release();
+
 	void update_chunk_mesh(const MeshData& p_mesh_data);
 	void update_chunk_collision(const CollisionData& p_collision_data);
 	void set_material(Ref<StandardMaterial3D> p_material);

@@ -7,6 +7,7 @@
 #include "collision_generator.h"
 #include "concurrent_chunk_map.h"
 #include "mesh_generator.h"
+#include "node_pool.h"
 #include "thread_pool.h"
 
 #include <godot_cpp/classes/node.hpp>
@@ -103,6 +104,8 @@ private:
 	std::shared_ptr<ConcurrentChunkMap> chunk_map;
 
 	HashMap<Vector3i, Chunk*> chunk_node_map{};
+	NodePool<Chunk> chunk_node_pool{ this };
+
 	std::vector<MeshData> mesh_datas{};
 	std::vector<CollisionData> collision_datas{};
 

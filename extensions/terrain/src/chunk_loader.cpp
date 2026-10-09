@@ -3,6 +3,7 @@
 #include "chunk_data.h"
 #include "chunk_generator.h"
 #include "chunk_lut.gen.h"
+#include "chunk_viewer.h"
 #include "collision_generator.h"
 #include "concurrent_chunk_map.h"
 #include "godot_utility.h"
@@ -13,6 +14,7 @@
 
 #include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/global_constants.hpp>
+#include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/thread.hpp>
@@ -26,6 +28,7 @@
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/core/object.hpp>
+#include <godot_cpp/core/object_id.hpp>
 #include <godot_cpp/core/property_info.hpp>
 #include <godot_cpp/variant/callable.hpp>
 #include <godot_cpp/variant/callable_method_pointer.hpp>
@@ -45,9 +48,6 @@
 #include <tracy/Tracy.hpp>
 #include <utility>
 #include <vector>
-#include <godot_cpp/classes/object.hpp>
-#include "chunk_viewer.h"
-#include <godot_cpp/core/object_id.hpp>
 
 using namespace godot;
 using namespace terrain_constants;
@@ -184,6 +184,14 @@ bool ChunkLoader::init()
 	chunk_viewer->reset();
 
 	chunk_node_map.reserve(32 * 32 * 32); // Reserve space for target chunk load distance
+
+	chunk_node_pool.preallocate(30 * 30 * 30,
+			[this]()
+			{
+				Chunk* chunk = memnew(Chunk);
+				chunk->set_material(material);
+				return chunk;
+			});
 
 	state = State::Ready;
 	return true;
@@ -336,6 +344,8 @@ void ChunkLoader::stop()
 	mesh_generator_pool->stop(); // Blocks execution until all threads are stopped
 
 	chunk_generator_pool->stop();
+
+	chunk_node_pool.clear();
 
 	state = State::Stopped;
 }
@@ -726,11 +736,16 @@ Chunk* ChunkLoader::_create_chunk_node(Vector3i chunk_pos)
 {
 	ZoneScopedN("ChunkLoader::_create_chunk_node");
 
-	// TODO: use an object pool
-	Chunk* chunk = memnew(Chunk);
+	Chunk* chunk = chunk_node_pool.acquire(
+			[this]()
+			{
+				Chunk* chunk = memnew(Chunk);
+				chunk->set_material(material);
+				return chunk;
+			});
 
 	chunk->set_position(chunk_pos * CHUNK_SIZE);
-	chunk->set_material(material);
+	chunk_node_map[chunk_pos] = chunk;
 
 #ifdef DEBUG_ENABLED
 	// The node name shouldn't be needed in release so we can skip it for a negligible speed increase
@@ -738,9 +753,6 @@ Chunk* ChunkLoader::_create_chunk_node(Vector3i chunk_pos)
 	std::snprintf(buffer, sizeof(buffer), "Chunk_%d_%d_%d", chunk_pos.x, chunk_pos.y, chunk_pos.z);
 	chunk->set_name(buffer);
 #endif
-
-	add_child(chunk);
-	chunk_node_map[chunk_pos] = chunk;
 
 	return chunk;
 }

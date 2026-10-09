@@ -15,6 +15,7 @@
 #include <godot_cpp/classes/world3d.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/variant/rid.hpp>
+
 #include <tracy/Tracy.hpp>
 
 using namespace godot;
@@ -40,6 +41,44 @@ Chunk::~Chunk()
 void Chunk::_ready()
 {
 	add_child(mesh_instance);
+}
+
+void Chunk::reset_state()
+{
+	mesh_revision = 0;
+	collision_revision = 0;
+
+	if (mesh_instance)
+	{
+		mesh_instance->set_mesh(nullptr);
+		mesh_instance->set_visible(false);
+	}
+
+	PhysicsServer3D* physics_server = PhysicsServer3D::get_singleton();
+	if (physics_server)
+	{
+		if (collision_shape_rid.is_valid())
+		{
+			if (physics_body_rid.is_valid())
+			{
+				physics_server->body_remove_shape(physics_body_rid, 0);
+			}
+			physics_server->free_rid(collision_shape_rid);
+			collision_shape_rid = RID();
+		}
+	}
+
+	set_visible(false);
+}
+
+void Chunk::on_pool_acquire()
+{
+	set_visible(true);
+}
+
+void Chunk::on_pool_release()
+{
+	reset_state();
 }
 
 void Chunk::update_chunk_mesh(const MeshData& p_mesh_data)
