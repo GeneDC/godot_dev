@@ -417,11 +417,7 @@ void ChunkLoader::_update_chunks()
 		return;
 	}
 
-	// TODO: Currently this only handles generating new chunks and meshing them. We need to:
-	// - Handle chunk unloading / scavenging
-	//		- Make sure we aren't re-creating any nodes, e.g. chunk, mesh, and collision nodes
-	//		- Potentially create them all at the start
-	// - save/load chunks to/from disc (when unloading is implemented)
+	// TODO: implement save/load chunks to/from disc. Only save chunks that have been "simulated" since loading.
 
 	std::vector<Vector3i> generate_positions;
 	constexpr int64_t CHUNK_GEN_BATCH_SIZE = 128;

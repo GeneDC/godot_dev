@@ -82,8 +82,7 @@ public:
 							for (auto it = data.begin(cursor); it != data.end(cursor); ++it)
 							{
 								const Vector3i& pos = it->first;
-								const Vector3i diff = pos - p_viewer_chunk_pos;
-								const float dist_sq = static_cast<float>(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
+								const float dist_sq = pos.distance_squared_to(p_viewer_chunk_pos);
 								if (dist_sq > unload_distance_sq)
 								{
 									candidates.push_back(pos);

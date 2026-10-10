@@ -22,8 +22,10 @@ public:
 
 	void get_chunk_positions(std::vector<Vector3i>& generate_positions, int64_t max_count);
 
-	static constexpr float collision_radius_sqr = 3.0f * 3.0f; // TODO: make collision radius configurable, it should be a project wide setting, and it should represent a distance in full chunks
-	inline bool should_chunk_have_collision(const Vector3i& chunk_pos) const { return last_chunk_pos.distance_squared_to(chunk_pos) < collision_radius_sqr; }
+	inline bool should_chunk_have_collision(const Vector3i& chunk_pos) const
+	{
+		return last_chunk_pos.distance_squared_to(chunk_pos) < static_cast<float>(simulation_distance * simulation_distance);
+	}
 
 	void reset();
 
@@ -34,13 +36,18 @@ public:
 protected:
 	static void _bind_methods();
 
+	int32_t get_simulation_distance() const { return simulation_distance; }
+	void set_simulation_distance(int32_t p_distance) { simulation_distance = p_distance; }
+
 private:
 	void update_view();
 
-	int current_shell = 0;
-	int current_index = 0;
+	int32_t simulation_distance{ 3 };
 
-	Vector3i last_chunk_pos = Vector3i(0, 0, 0);
+	int current_shell{ 0 };
+	int current_index{ 0 };
+
+	Vector3i last_chunk_pos{ Vector3i(0, 0, 0) };
 
 	std::mutex mutex{};
 };

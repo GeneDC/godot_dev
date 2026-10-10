@@ -4,12 +4,16 @@
 #include "chunk_lut.gen.h"
 #include "terrain_constants.h"
 
+#include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/core/object.hpp>
+#include <godot_cpp/core/property_info.hpp>
+#include <godot_cpp/variant/variant.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
-#include <tracy/Tracy.hpp>
 
 #include <cstdint>
 #include <mutex>
+#include <tracy/Tracy.hpp>
 #include <vector>
 
 using namespace godot;
@@ -17,6 +21,10 @@ using namespace godot;
 void ChunkViewer::_bind_methods()
 {
 	ClassDB::bind_method(D_METHOD("get_current_chunk_pos"), &ChunkViewer::get_current_chunk_pos);
+
+	ClassDB::bind_method(D_METHOD("get_simulation_distance"), &ChunkViewer::get_simulation_distance);
+	ClassDB::bind_method(D_METHOD("set_simulation_distance", "simulation_distance"), &ChunkViewer::set_simulation_distance);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "simulation_distance"), "set_simulation_distance", "get_simulation_distance");
 }
 
 void ChunkViewer::get_chunk_positions(std::vector<Vector3i>& generate_positions, int64_t max_count)
@@ -54,6 +62,14 @@ void ChunkViewer::get_chunk_positions(std::vector<Vector3i>& generate_positions,
 void ChunkViewer::reset()
 {
 	std::lock_guard<std::mutex> lock(mutex);
+
+	static constexpr const char* simulation_distance_setting_name{ "terrain/simulation/simulation_distance" };
+
+	ProjectSettings* settings = ProjectSettings::get_singleton();
+	if (settings && settings->has_setting(simulation_distance_setting_name))
+	{
+		simulation_distance = settings->get_setting(simulation_distance_setting_name);
+	}
 
 	current_shell = 0;
 	current_index = 0;
