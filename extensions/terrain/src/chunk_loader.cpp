@@ -475,19 +475,18 @@ void ChunkLoader::try_update_chunks()
 {
 	ZoneScopedN("ChunkLoader::try_update_chunks");
 
-	// TODO: Now that there's better memory management (unloading and pooling) should we re-access these task count limits
-	if (mesh_generator_pool->get_task_count() > 1024)
+	if (mesh_generator_pool->get_task_count() > 128)
 	{
 		// Don't queue chunks if the mesh_generator has enough work
 		return;
 	}
 
-	if (chunk_generator_pool->get_task_count() > 2048)
+	if (chunk_generator_pool->get_task_count() > 128)
 	{
 		return;
 	}
 
-	if (mesh_datas.size() > 1024)
+	if (mesh_datas.size() > 128)
 	{
 		return;
 	}
