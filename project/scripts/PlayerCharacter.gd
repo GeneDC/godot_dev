@@ -70,6 +70,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	
 	if Input.is_action_just_pressed("move_up"):
 		pressed_jump = false
+	
+	if Input.is_key_pressed(KEY_T): # debug teleport for testing chunk loading and unloading
+		# Add 10,000 to X and 100 to Y relative to current world position
+		global_position += Vector3(10000.0, 100.0, 0.0)
+		reset_physics_interpolation()
+		velocity = Vector3.ZERO
 
 	if event is InputEventMouseButton:
 		process_mouse_button(event as InputEventMouseButton)
