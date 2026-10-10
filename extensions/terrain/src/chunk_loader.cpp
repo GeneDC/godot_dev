@@ -242,6 +242,12 @@ void ChunkLoader::pipe_chunk_results(std::vector<ChunkPtr>&& p_chunk_ptrs)
 
 void ChunkLoader::pipe_mesh_results(std::vector<MeshData>&& p_mesh_datas)
 {
+	TerrainPerformanceMonitor* performance_monitor = TerrainPerformanceMonitor::get_singleton();
+	if (performance_monitor)
+	{
+		performance_monitor->record_meshes_generated(static_cast<int64_t>(p_mesh_datas.size()));
+	}
+
 	ChunkViewer* chunk_viewer = get_chunk_viewer();
 	if (chunk_viewer)
 	{

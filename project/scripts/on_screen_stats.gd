@@ -16,9 +16,12 @@ func _ready() -> void:
 	add_perf_monitor("Chunks", func() -> float: return Performance.get_custom_monitor("Terrain/LoadedChunkCount"))
 	add_perf_monitor("Chunks (Pooled)", func() -> float: return Performance.get_custom_monitor("Terrain/PooledChunkCount"))
 	add_perf_monitor("CPS", func() -> String: return "%.1f/s" % Performance.get_custom_monitor("Terrain/LoadedChunkCountPerSec"))
-	add_perf_monitor("Mesh Tasks", func() -> String: return "%.2f%%" % (100 * Performance.get_custom_monitor("Terrain/MeshTasksPerSec")))
-	add_perf_monitor("Pending Chunks", func() -> float: return Performance.get_custom_monitor("Terrain/PendingChunks"))
-	add_perf_monitor("Done Mesh Datas", func() -> float: return Performance.get_custom_monitor("Terrain/DoneMeshDatas"))
+	add_perf_monitor("MPS", func() -> String: return "%.1f/s" % Performance.get_custom_monitor("Terrain/MeshTasksPerSec"))
+	add_perf_monitor("Q Chunk", func() -> float: return Performance.get_custom_monitor("Terrain/PendingChunks"))
+	add_perf_monitor("Q Mesh", func() -> float: return Performance.get_custom_monitor("Terrain/PendingMeshTasks"))
+	add_perf_monitor("Q Coll", func() -> float: return Performance.get_custom_monitor("Terrain/PendingCollisions"))
+	add_perf_monitor("Staged Meshes", func() -> float: return Performance.get_custom_monitor("Terrain/DoneMeshDatas"))
+	add_perf_monitor("Staged Colls", func() -> float: return Performance.get_custom_monitor("Terrain/DoneCollisionDatas"))
 
 func add_perf_monitor(display_name: String, getter_callable: Callable) -> void:
 	monitors[display_name] = getter_callable

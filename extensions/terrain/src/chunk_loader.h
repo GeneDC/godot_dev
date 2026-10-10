@@ -73,6 +73,8 @@ public:
 	inline int64_t get_pending_chunks_count() const { return chunk_generator_pool.is_valid() ? chunk_generator_pool->get_task_count() : 0; }
 	inline int64_t get_pending_mesh_tasks_count() const { return mesh_generator_pool.is_valid() ? mesh_generator_pool->get_task_count() : 0; }
 	inline int64_t get_mesh_datas_count() const { return mesh_datas.size(); }
+	inline int64_t get_pending_collision_tasks_count() const { return collision_generator_pool.is_valid() ? collision_generator_pool->get_task_count() : 0; }
+	inline int64_t get_collision_datas_count() const { return collision_datas.size(); }
 
 	ChunkNode* get_or_create_chunk_node(Vector3i chunk_pos);
 	ChunkNode* get_chunk_node(Vector3i chunk_pos);

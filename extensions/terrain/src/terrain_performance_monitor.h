@@ -23,6 +23,7 @@ public:
 	void uninitialize();
 
 	void set_chunk_loader(ChunkLoader* p_chunk_loader);
+	void record_meshes_generated(int64_t p_count);
 
 	int64_t get_chunks();
 	int64_t get_pooled_chunks();
@@ -31,6 +32,8 @@ public:
 	int64_t get_pending_chunks_count();
 	int64_t get_pending_mesh_tasks_count();
 	int64_t get_done_mesh_data_count();
+	int64_t get_pending_collision_tasks_count();
+	int64_t get_done_collision_data_count();
 
 protected:
 	static void _bind_methods();
@@ -43,5 +46,7 @@ private:
 	int64_t last_chunk_time = 0;
 	int64_t last_loaded_chunk_count = 0;
 
-	float mesh_saturation = 0.0f;
+	float mesh_count_ps = 0.0f;
+	int64_t last_mesh_time = 0;
+	int64_t accumulated_mesh_count = 0;
 };
