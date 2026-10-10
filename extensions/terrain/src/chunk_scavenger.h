@@ -6,8 +6,8 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <vector>
 #include <iterator>
+#include <vector>
 
 using namespace godot;
 
@@ -45,42 +45,60 @@ public:
 			shard_cursors.assign(shard_count, 0);
 		}
 
-		current_shard_idx = (current_shard_idx + 1) % shard_count;
-		auto& cursor = shard_cursors[current_shard_idx];
-
 		std::vector<Vector3i> candidates;
 
-		// TODO: in inspect_shard should we use a try get lock instead of shared_lock to skip over shards that are currently locked?
-		p_chunk_map.inspect_shard(current_shard_idx,
-				[this, &cursor, &candidates, p_viewer_chunk_pos](const MapShardData& data)
-				{
-					const auto total_elements = data.size();
-					if (total_elements == 0)
+		int inspect_attempts = shard_count; // fail safe if all of the shards are somehow locked
+
+		bool did_inspect_shard{ false };
+		while (!did_inspect_shard && inspect_attempts > 0)
+		{
+			--inspect_attempts;
+
+			current_shard_idx = (current_shard_idx + 1) % shard_count;
+			auto& cursor = shard_cursors[current_shard_idx];
+
+			did_inspect_shard = p_chunk_map.try_inspect_shard(current_shard_idx,
+					[this, &cursor, &candidates, p_viewer_chunk_pos](const MapShardData& data)
 					{
-						cursor = 0;
-						return;
-					}
-					if (cursor >= total_elements)
-					{
-						cursor = 0;
-					}
-					auto it = data.begin();
-					std::advance(it, cursor);
-					uint32_t checks = 0;
-					while (it != data.end() && checks < max_checks_per_step)
-					{
-						const Vector3i& pos = it->first;
-						const Vector3i diff = pos - p_viewer_chunk_pos;
-						const float dist_sq = static_cast<float>(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
-						if (dist_sq > unload_distance_sq)
+						const auto total_elements = data.size();
+						if (total_elements == 0)
 						{
-							candidates.push_back(pos);
+							cursor = 0;
+							return;
 						}
-						++it;
-						++checks;
-					}
-					cursor = (it == data.end()) ? 0 : cursor + checks;
-				});
+						if (cursor >= total_elements)
+						{
+							cursor = 0;
+						}
+						const auto num_buckets = data.bucket_count();
+						if (cursor >= num_buckets)
+						{
+							cursor = 0;
+						}
+
+						uint32_t checks = 0;
+						while (cursor < num_buckets && checks < max_checks_per_step)
+						{
+							for (auto it = data.begin(cursor); it != data.end(cursor); ++it)
+							{
+								const Vector3i& pos = it->first;
+								const Vector3i diff = pos - p_viewer_chunk_pos;
+								const float dist_sq = static_cast<float>(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
+								if (dist_sq > unload_distance_sq)
+								{
+									candidates.push_back(pos);
+								}
+								++checks;
+							}
+							++cursor;
+						}
+
+						if (cursor >= num_buckets)
+						{
+							cursor = 0;
+						}
+					});
+		}
 
 		for (const Vector3i& pos : candidates)
 		{

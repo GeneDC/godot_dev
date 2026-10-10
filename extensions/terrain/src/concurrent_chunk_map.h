@@ -3,6 +3,7 @@
 #include "chunk_data.h"
 #include "safe_pool.h"
 
+#include <godot_cpp/core/error_macros.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
 
 #include <cstdint>
@@ -10,7 +11,6 @@
 #include <mutex>
 #include <shared_mutex>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -84,11 +84,17 @@ public:
 	}
 
 	template <typename Fn>
-	void inspect_shard(size_t shard_idx, Fn&& func)
+	bool try_inspect_shard(size_t shard_idx, Fn&& func)
 	{
-		MapShard& shard = map_shards[shard_idx % SHARD_COUNT];
-		std::shared_lock lock(shard.mutex);
-		func(shard.data);
+		CRASH_BAD_INDEX(shard_idx, map_shards.size());
+		MapShard& shard = map_shards[shard_idx];
+		std::shared_lock lock(shard.mutex, std::try_to_lock);
+		if (lock.owns_lock())
+		{
+			func(shard.data);
+			return true;
+		}
+		return false;
 	}
 
 	// Returns a COPY of the data so the map can be unlocked immediately
