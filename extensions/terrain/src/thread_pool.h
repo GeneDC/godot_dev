@@ -56,7 +56,7 @@ requires std::is_base_of_v<ITaskProcessor<TTask, TResult>, TProcessor> class Thr
 	static_assert(std::is_move_constructible_v<TResult>);
 
 public:
-	using OutputSink = std::function<void(TResult&&)>;
+	using OutputSinkFn = std::function<void(std::vector<TResult>&&)>;
 
 	ThreadPoolState get_state() const { return state.load(); }
 
@@ -71,7 +71,7 @@ private:
 	std::vector<TResult> results;
 
 	std::function<Ref<TProcessor>()> processor_factory;
-	OutputSink output_sink;
+	OutputSinkFn output_sync_fn{ nullptr };
 
 	String name;
 
@@ -82,14 +82,14 @@ public:
 		if (state.load() == ThreadPoolState::Ready) stop();
 	}
 
-	void set_output_sink(OutputSink p_sink)
+	void set_output_sink(OutputSinkFn p_sink_fn)
 	{
-		output_sink = std::move(p_sink);
+		output_sync_fn = std::move(p_sink_fn);
 	}
 
 	void init(int32_t p_thread_count, String p_name = "", std::function<Ref<TProcessor>()> p_processor_factory = []()
 			{ return memnew((TProcessor)); },
-			OutputSink p_output_sink = nullptr)
+			OutputSinkFn p_output_sink = nullptr)
 	{
 		if (state.load() != ThreadPoolState::Stopped)
 		{
@@ -108,7 +108,7 @@ public:
 		print_line("Initializing " + name + " with " + itos(p_thread_count) + " threads");
 
 		processor_factory = std::move(p_processor_factory);
-		output_sink = std::move(p_output_sink);
+		output_sync_fn = std::move(p_output_sink);
 
 		results_mutex.instantiate();
 
@@ -157,9 +157,13 @@ public:
 
 	void queue_task(TTask&& task, bool prioritise = false)
 	{
-		if (state.load() != ThreadPoolState::Ready)
+		const ThreadPoolState current_state = state.load();
+		if (current_state != ThreadPoolState::Ready)
 		{
-			PRINT_ERROR("Not ready. Task will be skipped.");
+			if (current_state != ThreadPoolState::Stopping) // queued tasks on stopping is expected so don't error
+			{
+				PRINT_ERROR("Thread Pool is stopped. Tasks will be skipped.");
+			}
 			return;
 		}
 
@@ -168,9 +172,13 @@ public:
 
 	void queue_task(std::vector<TTask>&& tasks, bool prioritise = false)
 	{
-		if (state.load() != ThreadPoolState::Ready)
+		const ThreadPoolState current_state = state.load();
+		if (current_state != ThreadPoolState::Ready)
 		{
-			PRINT_ERROR("Not ready. Task will be skipped.");
+			if (current_state != ThreadPoolState::Stopping) // queued tasks on stopping is expected so don't error
+			{
+				PRINT_ERROR("Thread Pool is stopped. Tasks will be skipped.");
+			}
 			return;
 		}
 
@@ -244,12 +252,9 @@ private:
 
 			if (!local_results_buffer.empty())
 			{
-				if (output_sink)
+				if (output_sync_fn)
 				{
-					for (TResult& res : local_results_buffer)
-					{
-						output_sink(std::move(res));
-					}
+					output_sync_fn(std::move(local_results_buffer));
 				}
 				else
 				{

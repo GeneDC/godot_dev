@@ -99,9 +99,9 @@ private:
 	void _update_chunks();
 	void update_chunk_collisions();
 
-	void pipe_chunk_result(ChunkPtr&& chunk_ptr);
-	void pipe_mesh_result(MeshData&& mesh_data);
-	void pipe_collision_result(CollisionData&& collision_data);
+	void pipe_chunk_results(std::vector<ChunkPtr>&& p_chunk_ptrs);
+	void pipe_mesh_results(std::vector<MeshData>&& p_mesh_datas);
+	void pipe_collision_results(std::vector<CollisionData>&& p_collision_datas);
 
 	ChunkNode* _create_chunk_node(Vector3i chunk_pos);
 
@@ -113,11 +113,11 @@ private:
 	HashMap<Vector3i, ChunkNode*> chunk_node_map{};
 	NodePool<ChunkNode> chunk_node_pool{ this };
 
-	std::mutex incoming_mesh_mutex{};
+	std::mutex incoming_mesh_datas_mutex{};
 	std::vector<MeshData> incoming_mesh_datas{};
 	std::vector<MeshData> mesh_datas{};
 
-	std::mutex incoming_collision_mutex{};
+	std::mutex incoming_collision_datas_mutex{};
 	std::vector<CollisionData> incoming_collision_datas{};
 	std::vector<CollisionData> collision_datas{};
 

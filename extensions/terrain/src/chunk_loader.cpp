@@ -138,8 +138,8 @@ bool ChunkLoader::init()
 				"CollisionGen",
 				[]()
 				{ return CollisionGenerator::create(); },
-				[this](CollisionData&& collision_data)
-				{ pipe_collision_result(std::move(collision_data)); });
+				[this](std::vector<CollisionData>&& collision_datas)
+				{ pipe_collision_results(std::move(collision_datas)); });
 	}
 	else
 	{
@@ -160,8 +160,8 @@ bool ChunkLoader::init()
 				"MeshGen",
 				[settings = mesh_generator_settings]()
 				{ return MeshGenerator::create(settings); },
-				[this](MeshData&& mesh_data)
-				{ pipe_mesh_result(std::move(mesh_data)); });
+				[this](std::vector<MeshData>&& mesh_datas)
+				{ pipe_mesh_results(std::move(mesh_datas)); });
 	}
 	else
 	{
@@ -182,8 +182,8 @@ bool ChunkLoader::init()
 				"ChunkGen",
 				[settings = chunk_generator_settings]()
 				{ return ChunkGenerator::create(settings); },
-				[this](ChunkPtr&& chunk_ptr)
-				{ pipe_chunk_result(std::move(chunk_ptr)); });
+				[this](std::vector<ChunkPtr>&& chunk_ptrs)
+				{ pipe_chunk_results(std::move(chunk_ptrs)); });
 	}
 	else
 	{
@@ -216,31 +216,60 @@ bool ChunkLoader::init()
 	return true;
 }
 
-void ChunkLoader::pipe_chunk_result(ChunkPtr&& chunk_ptr)
+void ChunkLoader::pipe_chunk_results(std::vector<ChunkPtr>&& p_chunk_ptrs)
 {
-	const ChunkData* chunk_data = chunk_map->publish_chunk(std::move(chunk_ptr));
-	if (chunk_data && chunk_data->surface_state == SurfaceState::MIXED)
+	std::vector<const ChunkData*> mixed_chunks;
+	mixed_chunks.reserve(p_chunk_ptrs.size());
+
+	for (ChunkPtr& chunk_ptr : p_chunk_ptrs)
 	{
-		mesh_generator_pool->queue_task(std::move(chunk_data));
+		const ChunkData* chunk_data = chunk_map->publish_chunk(std::move(chunk_ptr));
+		if (chunk_data && chunk_data->surface_state == SurfaceState::MIXED)
+		{
+			mixed_chunks.push_back(chunk_data);
+		}
+	}
+
+	if (!mixed_chunks.empty() && mesh_generator_pool->get_state() == ThreadPoolState::Ready)
+	{
+		mesh_generator_pool->queue_task(std::move(mixed_chunks));
 	}
 }
 
-void ChunkLoader::pipe_mesh_result(MeshData&& mesh_data)
+void ChunkLoader::pipe_mesh_results(std::vector<MeshData>&& p_mesh_datas)
 {
 	ChunkViewer* chunk_viewer = get_chunk_viewer();
-	if (chunk_viewer && chunk_viewer->should_chunk_have_collision(mesh_data.chunk_pos))
+	if (chunk_viewer)
 	{
-		collision_generator_pool->queue_task(MeshData(mesh_data));
+		std::vector<MeshData> collision_tasks;
+		for (const MeshData& mesh_data : p_mesh_datas)
+		{
+			if (chunk_viewer->should_chunk_have_collision(mesh_data.chunk_pos))
+			{
+				collision_tasks.push_back(mesh_data);
+			}
+		}
+
+		if (!collision_tasks.empty() && collision_generator_pool->get_state() == ThreadPoolState::Ready)
+		{
+			collision_generator_pool->queue_task(std::move(collision_tasks));
+		}
 	}
 
-	std::lock_guard<std::mutex> lock(incoming_mesh_mutex);
-	incoming_mesh_datas.push_back(std::move(mesh_data));
+	std::lock_guard<std::mutex> lock(incoming_mesh_datas_mutex);
+	incoming_mesh_datas.insert(
+			incoming_mesh_datas.end(),
+			std::make_move_iterator(p_mesh_datas.begin()),
+			std::make_move_iterator(p_mesh_datas.end()));
 }
 
-void ChunkLoader::pipe_collision_result(CollisionData&& collision_data)
+void ChunkLoader::pipe_collision_results(std::vector<CollisionData>&& p_collision_datas)
 {
-	std::lock_guard<std::mutex> lock(incoming_collision_mutex);
-	incoming_collision_datas.push_back(std::move(collision_data));
+	std::lock_guard<std::mutex> lock(incoming_collision_datas_mutex);
+	incoming_collision_datas.insert(
+			incoming_collision_datas.end(),
+			std::make_move_iterator(p_collision_datas.begin()),
+			std::make_move_iterator(p_collision_datas.end()));
 }
 
 void ChunkLoader::update()
@@ -271,7 +300,7 @@ void ChunkLoader::update()
 
 		std::vector<MeshData> drained_mesh_datas;
 		{
-			std::lock_guard<std::mutex> lock(incoming_mesh_mutex);
+			std::lock_guard<std::mutex> lock(incoming_mesh_datas_mutex);
 			if (!incoming_mesh_datas.empty())
 			{
 				drained_mesh_datas = std::move(incoming_mesh_datas);
@@ -334,7 +363,7 @@ void ChunkLoader::update()
 
 		std::vector<CollisionData> drained_collision_datas;
 		{
-			std::lock_guard<std::mutex> lock(incoming_collision_mutex);
+			std::lock_guard<std::mutex> lock(incoming_collision_datas_mutex);
 			if (!incoming_collision_datas.empty())
 			{
 				drained_collision_datas = std::move(incoming_collision_datas);
@@ -428,13 +457,13 @@ void ChunkLoader::stop()
 	chunk_node_pool.clear();
 
 	{
-		std::lock_guard<std::mutex> lock(incoming_mesh_mutex);
+		std::lock_guard<std::mutex> lock(incoming_mesh_datas_mutex);
 		incoming_mesh_datas.clear();
 	}
 	mesh_datas.clear();
 
 	{
-		std::lock_guard<std::mutex> lock(incoming_collision_mutex);
+		std::lock_guard<std::mutex> lock(incoming_collision_datas_mutex);
 		incoming_collision_datas.clear();
 	}
 	collision_datas.clear();
@@ -605,13 +634,13 @@ void ChunkLoader::unload_all()
 	}
 
 	{
-		std::lock_guard<std::mutex> lock(incoming_mesh_mutex);
+		std::lock_guard<std::mutex> lock(incoming_mesh_datas_mutex);
 		incoming_mesh_datas.clear();
 	}
 	mesh_datas.clear();
 
 	{
-		std::lock_guard<std::mutex> lock(incoming_collision_mutex);
+		std::lock_guard<std::mutex> lock(incoming_collision_datas_mutex);
 		incoming_collision_datas.clear();
 	}
 	collision_datas.clear();
