@@ -23,6 +23,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 using namespace godot;
@@ -68,10 +69,10 @@ public:
 	void modify_terrain_sphere(Vector3 global_position, float radius = 3.0f, bool is_subtract = false);
 	void modify_chunk(const ChunkData* source_chunk, const TerrainModification& modification);
 
-	std::weak_ptr<ConcurrentChunkMap> get_chunk_map() const { return chunk_map; }
-	int64_t get_pending_chunks_count() const { return chunk_generator_pool.is_valid() ? chunk_generator_pool->get_task_count() : 0; }
-	int64_t get_pending_mesh_tasks_count() const { return mesh_generator_pool.is_valid() ? mesh_generator_pool->get_task_count() : 0; }
-	int64_t get_mesh_datas_count() const { return mesh_datas.size(); }
+	inline std::weak_ptr<ConcurrentChunkMap> get_chunk_map() const { return chunk_map; }
+	inline int64_t get_pending_chunks_count() const { return chunk_generator_pool.is_valid() ? chunk_generator_pool->get_task_count() : 0; }
+	inline int64_t get_pending_mesh_tasks_count() const { return mesh_generator_pool.is_valid() ? mesh_generator_pool->get_task_count() : 0; }
+	inline int64_t get_mesh_datas_count() const { return mesh_datas.size(); }
 
 	ChunkNode* get_or_create_chunk_node(Vector3i chunk_pos);
 	ChunkNode* get_chunk_node(Vector3i chunk_pos);
@@ -98,6 +99,10 @@ private:
 	void _update_chunks();
 	void update_chunk_collisions();
 
+	void pipe_chunk_result(ChunkPtr&& chunk_ptr);
+	void pipe_mesh_result(MeshData&& mesh_data);
+	void pipe_collision_result(CollisionData&& collision_data);
+
 	ChunkNode* _create_chunk_node(Vector3i chunk_pos);
 
 	State state = State::Stopped;
@@ -108,7 +113,12 @@ private:
 	HashMap<Vector3i, ChunkNode*> chunk_node_map{};
 	NodePool<ChunkNode> chunk_node_pool{ this };
 
+	std::mutex incoming_mesh_mutex{};
+	std::vector<MeshData> incoming_mesh_datas{};
 	std::vector<MeshData> mesh_datas{};
+
+	std::mutex incoming_collision_mutex{};
+	std::vector<CollisionData> incoming_collision_datas{};
 	std::vector<CollisionData> collision_datas{};
 
 	using ChunkGeneratorPool = ThreadPool<ChunkGenerator, ChunkPtr, ChunkPtr>;

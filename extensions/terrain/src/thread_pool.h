@@ -56,6 +56,8 @@ requires std::is_base_of_v<ITaskProcessor<TTask, TResult>, TProcessor> class Thr
 	static_assert(std::is_move_constructible_v<TResult>);
 
 public:
+	using OutputSink = std::function<void(TResult&&)>;
+
 	ThreadPoolState get_state() const { return state.load(); }
 
 private:
@@ -69,6 +71,7 @@ private:
 	std::vector<TResult> results;
 
 	std::function<Ref<TProcessor>()> processor_factory;
+	OutputSink output_sink;
 
 	String name;
 
@@ -79,8 +82,14 @@ public:
 		if (state.load() == ThreadPoolState::Ready) stop();
 	}
 
+	void set_output_sink(OutputSink p_sink)
+	{
+		output_sink = std::move(p_sink);
+	}
+
 	void init(int32_t p_thread_count, String p_name = "", std::function<Ref<TProcessor>()> p_processor_factory = []()
-			{ return memnew((TProcessor)); })
+			{ return memnew((TProcessor)); },
+			OutputSink p_output_sink = nullptr)
 	{
 		if (state.load() != ThreadPoolState::Stopped)
 		{
@@ -99,6 +108,7 @@ public:
 		print_line("Initializing " + name + " with " + itos(p_thread_count) + " threads");
 
 		processor_factory = std::move(p_processor_factory);
+		output_sink = std::move(p_output_sink);
 
 		results_mutex.instantiate();
 
@@ -234,14 +244,24 @@ private:
 
 			if (!local_results_buffer.empty())
 			{
-				results_mutex->lock();
+				if (output_sink)
+				{
+					for (TResult& res : local_results_buffer)
+					{
+						output_sink(std::move(res));
+					}
+				}
+				else
+				{
+					results_mutex->lock();
 
-				results.insert(
-						results.end(),
-						std::make_move_iterator(local_results_buffer.begin()),
-						std::make_move_iterator(local_results_buffer.end()));
+					results.insert(
+							results.end(),
+							std::make_move_iterator(local_results_buffer.begin()),
+							std::make_move_iterator(local_results_buffer.end()));
 
-				results_mutex->unlock();
+					results_mutex->unlock();
+				}
 			}
 			local_results_buffer.clear();
 		}

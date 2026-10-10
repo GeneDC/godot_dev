@@ -45,6 +45,7 @@
 #include <cstdio>
 #include <iterator>
 #include <memory>
+#include <mutex>
 #include <tracy/Tracy.hpp>
 #include <utility>
 #include <vector>
@@ -117,6 +118,35 @@ bool ChunkLoader::init()
 		return false;
 	}
 
+	if (!chunk_map)
+	{
+		chunk_map = std::make_shared<ConcurrentChunkMap>();
+		chunk_viewer->chunk_map = chunk_map;
+		chunk_map->pre_allocate_chunks_per_shard(1024); // This should be pre-allocated based on render distance
+	}
+
+	if (!collision_generator_pool.is_valid())
+	{
+		collision_generator_pool.reference_ptr(memnew((CollisionGeneratorPool)));
+	}
+
+	if (collision_generator_pool->get_state() == ThreadPoolState::Stopped)
+	{
+		constexpr int64_t collision_generator_thread_count = 1;
+		collision_generator_pool->init(
+				collision_generator_thread_count,
+				"CollisionGen",
+				[]()
+				{ return CollisionGenerator::create(); },
+				[this](CollisionData&& collision_data)
+				{ pipe_collision_result(std::move(collision_data)); });
+	}
+	else
+	{
+		PRINT_ERROR("collision_generator_pool is stopping! It can't be initialised.");
+		return false;
+	}
+
 	if (!mesh_generator_pool.is_valid())
 	{
 		mesh_generator_pool.reference_ptr(memnew((MeshGeneratorPool)));
@@ -125,8 +155,13 @@ bool ChunkLoader::init()
 	if (mesh_generator_pool->get_state() == ThreadPoolState::Stopped)
 	{
 		constexpr int64_t mesh_generator_thread_count = 1;
-		mesh_generator_pool->init(mesh_generator_thread_count, "", [settings = mesh_generator_settings]()
-				{ return MeshGenerator::create(settings); });
+		mesh_generator_pool->init(
+				mesh_generator_thread_count,
+				"MeshGen",
+				[settings = mesh_generator_settings]()
+				{ return MeshGenerator::create(settings); },
+				[this](MeshData&& mesh_data)
+				{ pipe_mesh_result(std::move(mesh_data)); });
 	}
 	else
 	{
@@ -142,37 +177,18 @@ bool ChunkLoader::init()
 	if (chunk_generator_pool->get_state() == ThreadPoolState::Stopped)
 	{
 		constexpr int64_t chunk_generator_thread_count = 8;
-		chunk_generator_pool->init(chunk_generator_thread_count, "", [settings = chunk_generator_settings]()
-				{ return ChunkGenerator::create(settings); });
+		chunk_generator_pool->init(
+				chunk_generator_thread_count,
+				"ChunkGen",
+				[settings = chunk_generator_settings]()
+				{ return ChunkGenerator::create(settings); },
+				[this](ChunkPtr&& chunk_ptr)
+				{ pipe_chunk_result(std::move(chunk_ptr)); });
 	}
 	else
 	{
 		PRINT_ERROR("chunk_generator_pool is stopping! It can't be initialised.");
 		return false;
-	}
-
-	if (!collision_generator_pool.is_valid())
-	{
-		collision_generator_pool.reference_ptr(memnew((CollisionGeneratorPool)));
-	}
-
-	if (collision_generator_pool->get_state() == ThreadPoolState::Stopped)
-	{
-		constexpr int64_t collision_generator_thread_count = 1;
-		collision_generator_pool->init(collision_generator_thread_count, "", []()
-				{ return CollisionGenerator::create(); });
-	}
-	else
-	{
-		PRINT_ERROR("collision_generator_pool is stopping! It can't be initialised.");
-		return false;
-	}
-
-	if (!chunk_map)
-	{
-		chunk_map = std::make_shared<ConcurrentChunkMap>();
-		chunk_viewer->chunk_map = chunk_map;
-		chunk_map->pre_allocate_chunks_per_shard(1024); // This should be pre-allocated based on render distance
 	}
 
 	TerrainPerformanceMonitor* performance_monitor = TerrainPerformanceMonitor::get_singleton();
@@ -200,6 +216,33 @@ bool ChunkLoader::init()
 	return true;
 }
 
+void ChunkLoader::pipe_chunk_result(ChunkPtr&& chunk_ptr)
+{
+	const ChunkData* chunk_data = chunk_map->publish_chunk(std::move(chunk_ptr));
+	if (chunk_data && chunk_data->surface_state == SurfaceState::MIXED)
+	{
+		mesh_generator_pool->queue_task(std::move(chunk_data));
+	}
+}
+
+void ChunkLoader::pipe_mesh_result(MeshData&& mesh_data)
+{
+	ChunkViewer* chunk_viewer = get_chunk_viewer();
+	if (chunk_viewer && chunk_viewer->should_chunk_have_collision(mesh_data.chunk_pos))
+	{
+		collision_generator_pool->queue_task(MeshData(mesh_data));
+	}
+
+	std::lock_guard<std::mutex> lock(incoming_mesh_mutex);
+	incoming_mesh_datas.push_back(std::move(mesh_data));
+}
+
+void ChunkLoader::pipe_collision_result(CollisionData&& collision_data)
+{
+	std::lock_guard<std::mutex> lock(incoming_collision_mutex);
+	incoming_collision_datas.push_back(std::move(collision_data));
+}
+
 void ChunkLoader::update()
 {
 	ZoneScopedN("ChunkLoader::update");
@@ -220,28 +263,36 @@ void ChunkLoader::update()
 	try_update_chunks();
 
 	uint64_t start_time = Time::get_singleton()->get_ticks_usec();
-	// budget in microseconds: 2000us = 2ms
+	// budget in microseconds: 4000us = 4ms
 	constexpr uint64_t mesh_time_budget = 4000;
 
-	{ // move the done meshes to our array so we can take time applying them
+	{ // Drain piped meshe datas into local list and prioritise closest
 		ZoneNamedN(zoneTakeDoneMeshData, "Take and Sort Mesh Data", true);
 
-		std::vector<MeshData> done_mesh_datas = mesh_generator_pool->take_results();
+		std::vector<MeshData> drained_mesh_datas;
+		{
+			std::lock_guard<std::mutex> lock(incoming_mesh_mutex);
+			if (!incoming_mesh_datas.empty())
+			{
+				drained_mesh_datas = std::move(incoming_mesh_datas);
+				incoming_mesh_datas.clear();
+			}
+		}
 
-		String info_text = "Mesh Data Count: " + String::num_int64(done_mesh_datas.size());
+		String info_text = "Mesh Data Count: " + String::num_int64(drained_mesh_datas.size());
 		CharString utf8_text = info_text.utf8();
 		ZoneText(utf8_text.get_data(), utf8_text.length());
 
-		if (!done_mesh_datas.empty())
+		if (!drained_mesh_datas.empty())
 		{
 			mesh_datas.insert(
 					mesh_datas.end(),
-					std::make_move_iterator(done_mesh_datas.begin()),
-					std::make_move_iterator(done_mesh_datas.end()));
+					std::make_move_iterator(drained_mesh_datas.begin()),
+					std::make_move_iterator(drained_mesh_datas.end()));
 
 			ChunkViewer* chunk_viewer = get_chunk_viewer();
 			Vector3 centre_pos = chunk_viewer->get_current_chunk_pos();
-			uint64_t count = std::min<uint64_t>(mesh_datas.size(), 10); // It's unlikely we'll process more than 10, so only sort that many
+			uint64_t count = std::min<uint64_t>(mesh_datas.size(), 100); // It's unlikely we'll process more than 100, so only sort that many
 			// Sort x closest positions to the back, using reverse iterators
 			std::ranges::partial_sort(
 					mesh_datas.rbegin(),
@@ -281,22 +332,30 @@ void ChunkLoader::update()
 	{
 		ZoneNamedN(zoneSortCollisionData, "Take and Sort Collision Data", true);
 
-		std::vector<CollisionData> done_collision_datas = collision_generator_pool->take_results();
+		std::vector<CollisionData> drained_collision_datas;
+		{
+			std::lock_guard<std::mutex> lock(incoming_collision_mutex);
+			if (!incoming_collision_datas.empty())
+			{
+				drained_collision_datas = std::move(incoming_collision_datas);
+				incoming_collision_datas.clear();
+			}
+		}
 
-		String info_text = "Done Collision Data Count: " + String::num_int64(done_collision_datas.size());
+		String info_text = "Done Collision Data Count: " + String::num_int64(drained_collision_datas.size());
 		CharString utf8_text = info_text.utf8();
 		ZoneText(utf8_text.get_data(), utf8_text.length());
 
-		if (!done_collision_datas.empty())
+		if (!drained_collision_datas.empty())
 		{
 			collision_datas.insert(
 					collision_datas.end(),
-					std::make_move_iterator(done_collision_datas.begin()),
-					std::make_move_iterator(done_collision_datas.end()));
+					std::make_move_iterator(drained_collision_datas.begin()),
+					std::make_move_iterator(drained_collision_datas.end()));
 
 			ChunkViewer* chunk_viewer = get_chunk_viewer();
 			Vector3 centre_pos = chunk_viewer->get_current_chunk_pos();
-			uint64_t count = std::min<uint64_t>(collision_datas.size(), 10); // It's unlikely we'll process more than 10, so only sort that many
+			uint64_t count = std::min<uint64_t>(collision_datas.size(), 100); // It's unlikely we'll process more than 100, so only sort that many
 			// Sort x closest positions to the back, using reverse iterators
 			std::ranges::partial_sort(
 					collision_datas.rbegin(),
@@ -363,10 +422,22 @@ void ChunkLoader::stop()
 	state = State::Stopping;
 
 	mesh_generator_pool->stop(); // Blocks execution until all threads are stopped
-
 	chunk_generator_pool->stop();
+	collision_generator_pool->stop();
 
 	chunk_node_pool.clear();
+
+	{
+		std::lock_guard<std::mutex> lock(incoming_mesh_mutex);
+		incoming_mesh_datas.clear();
+	}
+	mesh_datas.clear();
+
+	{
+		std::lock_guard<std::mutex> lock(incoming_collision_mutex);
+		incoming_collision_datas.clear();
+	}
+	collision_datas.clear();
 
 	state = State::Stopped;
 }
@@ -375,10 +446,10 @@ void ChunkLoader::try_update_chunks()
 {
 	ZoneScopedN("ChunkLoader::try_update_chunks");
 
+	// TODO: Now that there's better memory management (unloading and pooling) should we re-access these task count limits
 	if (mesh_generator_pool->get_task_count() > 1024)
 	{
 		// Don't queue chunks if the mesh_generator has enough work
-		// We could still be generating chunks, but until there's chunk unloading and better memory management this is better than causing stutters.
 		return;
 	}
 
@@ -435,47 +506,6 @@ void ChunkLoader::_update_chunks()
 
 			chunk_generator_pool->queue_task(std::move(chunks_to_generate));
 		}
-	}
-	std::vector<std::pair<Vector3i, ChunkNode*>> collision_chunks;
-	{
-		ZoneNamedN(zoneQueueChunksForCollision, "Queue chunks for collision", true);
-		if (collision_chunks.size() > 0)
-		{
-			std::vector<MeshData> chunks_to_add_collision;
-			chunks_to_add_collision.reserve(collision_chunks.size());
-			for (const auto& [chunk_pos, chunk_node] : collision_chunks)
-			{
-				MeshData mesh_data = {
-					chunk_pos,
-					chunk_node->get_array_mesh(),
-					0, // Collision gen doesn't care about vertex count
-					chunk_node->get_mesh_revision()
-				};
-
-				chunks_to_add_collision.push_back(mesh_data);
-			}
-
-			collision_generator_pool->queue_task(std::move(chunks_to_add_collision));
-		}
-	}
-
-	// TODO: Add a better way to queue these tasks. Pipe the chunk_generator_pool to the mesh_generator_pool
-	std::vector<ChunkPtr> chunk_ptrs = chunk_generator_pool->take_results();
-	if (chunk_ptrs.size() > 0)
-	{
-		std::vector<const ChunkData*> chunk_datas;
-		chunk_datas.reserve(chunk_ptrs.size());
-		for (int i = 0; i < chunk_ptrs.size(); ++i)
-		{
-			const ChunkData* chunk_data = chunk_map->publish_chunk(std::move(chunk_ptrs[i]));
-			// Ignore empty and full chunks as they don't need to be generated
-			if (chunk_data->surface_state == SurfaceState::MIXED)
-			{
-				chunk_datas.push_back(chunk_data);
-			}
-		}
-
-		mesh_generator_pool->queue_task(std::move(chunk_datas));
 	}
 }
 
@@ -552,7 +582,7 @@ void ChunkLoader::update_chunk_collisions()
 
 		if (!any_in_range)
 		{
-			// Avoid processing all shell ranges if we exhaused this one.
+			// Avoid processing all shell ranges if we exhausted this one.
 			break;
 		}
 	}
@@ -573,6 +603,18 @@ void ChunkLoader::unload_all()
 	{
 		chunk_viewer->reset();
 	}
+
+	{
+		std::lock_guard<std::mutex> lock(incoming_mesh_mutex);
+		incoming_mesh_datas.clear();
+	}
+	mesh_datas.clear();
+
+	{
+		std::lock_guard<std::mutex> lock(incoming_collision_mutex);
+		incoming_collision_datas.clear();
+	}
+	collision_datas.clear();
 }
 
 void ChunkLoader::modify_terrain_sphere(Vector3 global_position, float radius, bool is_subtract)
