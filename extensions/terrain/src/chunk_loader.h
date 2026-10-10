@@ -1,6 +1,6 @@
 #pragma once
 
-#include "chunk.h"
+#include "chunk_node.h"
 #include "chunk_data.h"
 #include "chunk_generator.h"
 #include "chunk_viewer.h"
@@ -72,8 +72,8 @@ public:
 	int64_t get_pending_mesh_tasks_count() const { return mesh_generator_pool.is_valid() ? mesh_generator_pool->get_task_count() : 0; }
 	int64_t get_mesh_datas_count() const { return mesh_datas.size(); }
 
-	Chunk* get_or_create_chunk_node(Vector3i chunk_pos);
-	Chunk* get_chunk_node(Vector3i chunk_pos);
+	ChunkNode* get_or_create_chunk_node(Vector3i chunk_pos);
+	ChunkNode* get_chunk_node(Vector3i chunk_pos);
 
 	Ref<StandardMaterial3D> material;
 
@@ -97,14 +97,14 @@ private:
 	void _update_chunks();
 	void update_chunk_collisions();
 
-	Chunk* _create_chunk_node(Vector3i chunk_pos);
+	ChunkNode* _create_chunk_node(Vector3i chunk_pos);
 
 	State state = State::Stopped;
 
 	std::shared_ptr<ConcurrentChunkMap> chunk_map;
 
-	HashMap<Vector3i, Chunk*> chunk_node_map{};
-	NodePool<Chunk> chunk_node_pool{ this };
+	HashMap<Vector3i, ChunkNode*> chunk_node_map{};
+	NodePool<ChunkNode> chunk_node_pool{ this };
 
 	std::vector<MeshData> mesh_datas{};
 	std::vector<CollisionData> collision_datas{};

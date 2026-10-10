@@ -22,7 +22,7 @@ public:
 
 	void get_chunk_positions(std::vector<Vector3i>& generate_positions, int64_t max_count);
 
-	static constexpr float collision_radius_sqr = 3.0f * 3.0f; // TODO: make this configurable
+	static constexpr float collision_radius_sqr = 3.0f * 3.0f; // TODO: make collision radius configurable, it should be a project wide setting, and it should represent a distance in full chunks
 	inline bool should_chunk_have_collision(const Vector3i& chunk_pos) const { return last_chunk_pos.distance_squared_to(chunk_pos) < collision_radius_sqr; }
 
 	void reset();

@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://dh0oj81pufivs"]
+[gd_scene format=3 uid="uid://dh0oj81pufivs"]
 
 [ext_resource type="Script" uid="uid://bi504r0doyid6" path="res://scripts/example.gd" id="1_n51mc"]
 [ext_resource type="Script" uid="uid://c7561n2mnt1m4" path="res://scripts/FreeCamera.gd" id="2_n51mc"]
@@ -10,46 +10,46 @@
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_rujmf"]
 
-[node name="Node" type="Node" node_paths=PackedStringArray("player_view_control", "free_cam_view_control")]
+[node name="Node" type="Node" unique_id=1284362478 node_paths=PackedStringArray("player_view_control", "free_cam_view_control")]
 script = ExtResource("1_n51mc")
 player_view_control = NodePath("CharacterBody3D/ViewControl")
 free_cam_view_control = NodePath("Camera3D/ViewControl")
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1926808519]
 transform = Transform3D(1, 0, 0, 0, -0.3391156, 0.9407447, 0, -0.9407447, -0.3391156, 0.8409251, 52.441833, 0)
 
-[node name="Camera3D" type="Camera3D" parent="."]
+[node name="Camera3D" type="Camera3D" parent="." unique_id=449296370]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.495, 20, 5.713)
 script = ExtResource("2_n51mc")
 
-[node name="ViewControl" type="Node" parent="Camera3D" node_paths=PackedStringArray("camera", "controlled_node")]
+[node name="ViewControl" type="Node" parent="Camera3D" unique_id=200469701 node_paths=PackedStringArray("camera", "controlled_node")]
 script = ExtResource("6_ugfer")
 camera = NodePath("..")
 controlled_node = NodePath("..")
 metadata/_custom_type_script = "uid://bwob5lwa8nf23"
 
-[node name="CharacterBody3D" type="CharacterBody3D" parent="."]
+[node name="CharacterBody3D" type="CharacterBody3D" parent="." unique_id=129912867]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 15, 0)
 script = ExtResource("5_ei00m")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="CharacterBody3D"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="CharacterBody3D" unique_id=2077029034]
 shape = SubResource("CapsuleShape3D_ugfer")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="CharacterBody3D"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="CharacterBody3D" unique_id=284201851]
 mesh = SubResource("CapsuleMesh_rujmf")
 
-[node name="Camera3D" type="Camera3D" parent="CharacterBody3D"]
+[node name="Camera3D" type="Camera3D" parent="CharacterBody3D" unique_id=596722666]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 
-[node name="RayCast3D" type="RayCast3D" parent="CharacterBody3D/Camera3D"]
+[node name="RayCast3D" type="RayCast3D" parent="CharacterBody3D/Camera3D" unique_id=1402078127]
 target_position = Vector3(0, 0, -10)
 
-[node name="ViewControl" type="Node" parent="CharacterBody3D" node_paths=PackedStringArray("camera", "controlled_node")]
+[node name="ViewControl" type="Node" parent="CharacterBody3D" unique_id=136085309 node_paths=PackedStringArray("camera", "controlled_node")]
 script = ExtResource("6_ugfer")
 camera = NodePath("../Camera3D")
 controlled_node = NodePath("..")
 activate_on_ready = true
 metadata/_custom_type_script = "uid://bwob5lwa8nf23"
 
-[node name="ChunkViewer" type="ChunkViewer" parent="CharacterBody3D"]
+[node name="ChunkViewer" type="ChunkViewer" parent="CharacterBody3D" unique_id=1543508269]
 script = ExtResource("6_rujmf")

@@ -15,13 +15,13 @@ struct CollisionData;
 
 using namespace godot;
 
-class Chunk : public Node3D
+class ChunkNode : public Node3D
 {
-	GDCLASS(Chunk, Node3D)
+	GDCLASS(ChunkNode, Node3D)
 
 public:
-	Chunk();
-	~Chunk();
+	ChunkNode();
+	~ChunkNode();
 
 	virtual void _ready() override;
 

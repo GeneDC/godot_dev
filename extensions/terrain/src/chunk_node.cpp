@@ -1,4 +1,4 @@
-#include "chunk.h"
+#include "chunk_node.h"
 
 #include "collision_generator.h"
 #include "mesh_generator.h"
@@ -20,12 +20,12 @@
 
 using namespace godot;
 
-Chunk::Chunk()
+ChunkNode::ChunkNode()
 {
 	mesh_instance = memnew(MeshInstance3D);
 }
 
-Chunk::~Chunk()
+ChunkNode::~ChunkNode()
 {
 	PhysicsServer3D* physics_server = PhysicsServer3D::get_singleton();
 	if (physics_server && physics_body_rid.is_valid())
@@ -38,12 +38,12 @@ Chunk::~Chunk()
 	}
 }
 
-void Chunk::_ready()
+void ChunkNode::_ready()
 {
 	add_child(mesh_instance);
 }
 
-void Chunk::reset_state()
+void ChunkNode::reset_state()
 {
 	mesh_revision = 0;
 	collision_revision = 0;
@@ -71,17 +71,17 @@ void Chunk::reset_state()
 	set_visible(false);
 }
 
-void Chunk::on_pool_acquire()
+void ChunkNode::on_pool_acquire()
 {
 	set_visible(true);
 }
 
-void Chunk::on_pool_release()
+void ChunkNode::on_pool_release()
 {
 	reset_state();
 }
 
-void Chunk::update_chunk_mesh(const MeshData& p_mesh_data)
+void ChunkNode::update_chunk_mesh(const MeshData& p_mesh_data)
 {
 	if (!mesh_instance)
 	{
@@ -107,7 +107,7 @@ void Chunk::update_chunk_mesh(const MeshData& p_mesh_data)
 	}
 }
 
-void Chunk::update_chunk_collision(const CollisionData& p_collision_data)
+void ChunkNode::update_chunk_collision(const CollisionData& p_collision_data)
 {
 	ZoneScopedN("Chunk::update_chunk_collision");
 
@@ -151,7 +151,7 @@ void Chunk::update_chunk_collision(const CollisionData& p_collision_data)
 	}
 }
 
-void Chunk::set_material(Ref<StandardMaterial3D> p_material)
+void ChunkNode::set_material(Ref<StandardMaterial3D> p_material)
 {
 	if (mesh_instance)
 	{
@@ -159,7 +159,7 @@ void Chunk::set_material(Ref<StandardMaterial3D> p_material)
 	}
 }
 
-Ref<ArrayMesh> Chunk::get_array_mesh() const
+Ref<ArrayMesh> ChunkNode::get_array_mesh() const
 {
 	if (!mesh_instance)
 	{

@@ -1,6 +1,6 @@
 #include "register_types.h"
 
-#include "chunk.h"
+#include "chunk_node.h"
 #include "chunk_generator.h"
 #include "chunk_loader.h"
 #include "chunk_viewer.h"
@@ -42,7 +42,7 @@ static void initialize_gdextension_types(ModuleInitializationLevel p_level)
 	{
 		return;
 	}
-	GDREGISTER_CLASS(Chunk)
+	GDREGISTER_CLASS(ChunkNode)
 	GDREGISTER_CLASS(ChunkGeneratorSettings)
 	GDREGISTER_CLASS(ChunkGenerator)
 	GDREGISTER_CLASS(ChunkLoader)

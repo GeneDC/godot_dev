@@ -3,6 +3,7 @@
 #include "chunk_data.h"
 #include "chunk_generator.h"
 #include "chunk_lut.gen.h"
+#include "chunk_node.h"
 #include "chunk_viewer.h"
 #include "collision_generator.h"
 #include "concurrent_chunk_map.h"
@@ -40,7 +41,6 @@
 #include <godot_cpp/variant/vector3i.hpp>
 
 #include <algorithm>
-#include <chunk.h>
 #include <cstdint>
 #include <cstdio>
 #include <iterator>
@@ -188,9 +188,9 @@ bool ChunkLoader::init()
 	chunk_node_pool.preallocate(30 * 30 * 30,
 			[this]()
 			{
-				Chunk* chunk = memnew(Chunk);
-				chunk->set_material(material);
-				return chunk;
+				ChunkNode* chunk_node = memnew(ChunkNode);
+				chunk_node->set_material(material);
+				return chunk_node;
 			});
 
 	state = State::Ready;
@@ -266,8 +266,8 @@ void ChunkLoader::update()
 			MeshData mesh_data = mesh_datas.back();
 			mesh_datas.pop_back();
 
-			Chunk* chunk = get_or_create_chunk_node(mesh_data.chunk_pos);
-			chunk->update_chunk_mesh(mesh_data);
+			ChunkNode* chunk_node = get_or_create_chunk_node(mesh_data.chunk_pos);
+			chunk_node->update_chunk_mesh(mesh_data);
 		}
 	}
 
@@ -325,8 +325,8 @@ void ChunkLoader::update()
 			CollisionData collision_data = collision_datas.back();
 			collision_datas.pop_back();
 
-			Chunk* chunk = get_or_create_chunk_node(collision_data.chunk_pos);
-			chunk->update_chunk_collision(collision_data);
+			ChunkNode* chunk_node = get_or_create_chunk_node(collision_data.chunk_pos);
+			chunk_node->update_chunk_collision(collision_data);
 		}
 	}
 }
@@ -419,7 +419,7 @@ void ChunkLoader::_update_chunks()
 			chunk_generator_pool->queue_task(std::move(chunks_to_generate));
 		}
 	}
-	std::vector<std::pair<Vector3i, Chunk*>> collision_chunks;
+	std::vector<std::pair<Vector3i, ChunkNode*>> collision_chunks;
 	{
 		ZoneNamedN(zoneQueueChunksForCollision, "Queue chunks for collision", true);
 		if (collision_chunks.size() > 0)
@@ -505,7 +505,7 @@ void ChunkLoader::update_chunk_collisions()
 				continue;
 			}
 
-			Chunk* chunk_node = get_chunk_node(chunk_pos);
+			ChunkNode* chunk_node = get_chunk_node(chunk_pos);
 			if (!chunk_node)
 			{
 				continue;
@@ -693,19 +693,19 @@ void ChunkLoader::modify_chunk(const ChunkData* source_chunk_data, const Terrain
 	}
 }
 
-Chunk* ChunkLoader::get_or_create_chunk_node(Vector3i chunk_pos)
+ChunkNode* ChunkLoader::get_or_create_chunk_node(Vector3i chunk_pos)
 {
 	ZoneScopedN("ChunkLoader::get_or_create_chunk_node");
 
-	if (Chunk* chunk = get_chunk_node(chunk_pos))
+	if (ChunkNode* chunk_node = get_chunk_node(chunk_pos))
 	{
-		return chunk;
+		return chunk_node;
 	}
 
 	return _create_chunk_node(chunk_pos);
 }
 
-Chunk* ChunkLoader::get_chunk_node(Vector3i chunk_pos)
+ChunkNode* ChunkLoader::get_chunk_node(Vector3i chunk_pos)
 {
 	ZoneScopedN("ChunkLoader::get_chunk_node");
 
@@ -732,27 +732,27 @@ void ChunkLoader::set_chunk_viewer(ChunkViewer* p_chunk_viewer)
 	chunk_viewer_id = p_chunk_viewer ? p_chunk_viewer->get_instance_id() : ObjectID();
 }
 
-Chunk* ChunkLoader::_create_chunk_node(Vector3i chunk_pos)
+ChunkNode* ChunkLoader::_create_chunk_node(Vector3i chunk_pos)
 {
 	ZoneScopedN("ChunkLoader::_create_chunk_node");
 
-	Chunk* chunk = chunk_node_pool.acquire(
+	ChunkNode* chunk_node = chunk_node_pool.acquire(
 			[this]()
 			{
-				Chunk* chunk = memnew(Chunk);
-				chunk->set_material(material);
-				return chunk;
+				ChunkNode* chunk_node = memnew(ChunkNode);
+				chunk_node->set_material(material);
+				return chunk_node;
 			});
 
-	chunk->set_position(chunk_pos * CHUNK_SIZE);
-	chunk_node_map[chunk_pos] = chunk;
+	chunk_node->set_position(chunk_pos * CHUNK_SIZE);
+	chunk_node_map[chunk_pos] = chunk_node;
 
 #ifdef DEBUG_ENABLED
 	// The node name shouldn't be needed in release so we can skip it for a negligible speed increase
 	char buffer[32];
 	std::snprintf(buffer, sizeof(buffer), "Chunk_%d_%d_%d", chunk_pos.x, chunk_pos.y, chunk_pos.z);
-	chunk->set_name(buffer);
+	chunk_node->set_name(buffer);
 #endif
 
-	return chunk;
+	return chunk_node;
 }
