@@ -20,6 +20,7 @@ struct ShellRange
 	uint32_t end;
 };
 
+static constexpr uint64_t CHUNK_MAX_RADIUS = 32;
 static constexpr uint64_t CHUNK_SHELL_RANGE_COUNT = 30;
 alignas(64) static constexpr ShellRange CHUNK_SHELL_RANGES[] = {
 	{0, 123}, // Shell 0 Count: 123

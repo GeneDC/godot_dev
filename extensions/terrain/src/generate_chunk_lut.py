@@ -60,6 +60,7 @@ struct ShellRange
 	uint32_t end;
 };\n\n""")
     
+    f.write(f"static constexpr uint64_t CHUNK_MAX_RADIUS = {RADIUS};\n")
     f.write(f"static constexpr uint64_t CHUNK_SHELL_RANGE_COUNT = {len(offset_shells)};\n")
     f.write("alignas(64) static constexpr ShellRange CHUNK_SHELL_RANGES[] = {\n")
     begin = 0
