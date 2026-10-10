@@ -1,8 +1,9 @@
 #pragma once
 
-#include "chunk_node.h"
 #include "chunk_data.h"
 #include "chunk_generator.h"
+#include "chunk_node.h"
+#include "chunk_scavenger.h"
 #include "chunk_viewer.h"
 #include "collision_generator.h"
 #include "concurrent_chunk_map.h"
@@ -102,6 +103,7 @@ private:
 	State state = State::Stopped;
 
 	std::shared_ptr<ConcurrentChunkMap> chunk_map;
+	ChunkScavenger chunk_scavenger;
 
 	HashMap<Vector3i, ChunkNode*> chunk_node_map{};
 	NodePool<ChunkNode> chunk_node_pool{ this };

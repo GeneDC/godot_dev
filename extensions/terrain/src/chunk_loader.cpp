@@ -183,6 +183,9 @@ bool ChunkLoader::init()
 
 	chunk_viewer->reset();
 
+	constexpr float unload_margin{ 3.0f };
+	chunk_scavenger.set_unload_distance(CHUNK_MAX_RADIUS + unload_margin);
+
 	chunk_node_map.reserve(32 * 32 * 32); // Reserve space for target chunk load distance
 
 	chunk_node_pool.preallocate(30 * 30 * 30,
@@ -327,6 +330,24 @@ void ChunkLoader::update()
 
 			ChunkNode* chunk_node = get_or_create_chunk_node(collision_data.chunk_pos);
 			chunk_node->update_chunk_collision(collision_data);
+		}
+	}
+
+	{
+		ZoneNamedN(zoneScavengeChunks, "Scavenge Chunks", true);
+
+		ChunkViewer* chunk_viewer = get_chunk_viewer();
+		std::vector<Vector3i> chunks_to_unload;
+		chunk_scavenger.scavenge(*chunk_map, chunk_viewer->get_current_chunk_pos(), chunks_to_unload);
+
+		for (const Vector3i& pos : chunks_to_unload)
+		{
+			auto it = chunk_node_map.find(pos);
+			if (it != chunk_node_map.end())
+			{
+				chunk_node_pool.release(it->value);
+				chunk_node_map.erase(pos);
+			}
 		}
 	}
 }

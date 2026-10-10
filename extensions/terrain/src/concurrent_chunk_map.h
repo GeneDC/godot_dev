@@ -37,6 +37,8 @@ struct Vector3iHasher
 	}
 };
 
+typedef std::unordered_map<Vector3i, ChunkPtr, Vector3iHasher> MapShardData;
+
 class ConcurrentChunkMap
 {
 private:
@@ -52,15 +54,11 @@ private:
 
 	struct MapShard
 	{
-		std::unordered_map<Vector3i, ChunkPtr, Vector3iHasher> data;
+		MapShardData data;
 		mutable std::shared_mutex mutex;
 	};
 
 	std::vector<MapShard> map_shards;
-
-	// Separate list of work for the Compute Thread
-	std::unordered_set<Vector3i, Vector3iHasher> dirty_positions{};
-	std::mutex dirty_mutex{};
 
 	int64_t get_shard(const Vector3i& pos) const
 	{
@@ -85,13 +83,12 @@ public:
 		}
 	}
 
-	// TODO: either use or remove the dirty list from here. Currently the chunk is just queued for meshing externally after calling publish_chunk
-	std::vector<Vector3i> consume_dirty_list()
+	template <typename Fn>
+	void inspect_shard(size_t shard_idx, Fn&& func)
 	{
-		std::lock_guard lock(dirty_mutex);
-		std::vector<Vector3i> result(dirty_positions.begin(), dirty_positions.end());
-		result.clear();
-		return result;
+		MapShard& shard = map_shards[shard_idx % SHARD_COUNT];
+		std::shared_lock lock(shard.mutex);
+		func(shard.data);
 	}
 
 	// Returns a COPY of the data so the map can be unlocked immediately
@@ -146,7 +143,7 @@ public:
 		return std::move(chunk_ptr);
 	}
 
-	const ChunkData* publish_chunk(ChunkPtr new_chunk_ptr, bool mark_dirty = true)
+	const ChunkData* publish_chunk(ChunkPtr new_chunk_ptr)
 	{
 		const Vector3i pos = new_chunk_ptr->position;
 		const int64_t shard_idx = get_shard(pos);
@@ -156,11 +153,6 @@ public:
 			MapShard& shard = map_shards[shard_idx];
 			std::unique_lock lock(shard.mutex);
 			shard.data[pos] = std::move(new_chunk_ptr);
-		}
-		if (mark_dirty)
-		{
-			std::lock_guard lock(dirty_mutex);
-			dirty_positions.insert(pos);
 		}
 		return result;
 	}
@@ -179,6 +171,11 @@ public:
 			std::shared_lock lock(shard.mutex);
 			shard.data.clear();
 		}
+	}
+
+	int64_t get_shard_count() const
+	{
+		return map_shards.size();
 	}
 
 	int64_t get_loaded_count() const
