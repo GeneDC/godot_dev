@@ -8,3 +8,6 @@
 [submodule "thirdparty/tracy"]
 	path = thirdparty/tracy
 	url = https://github.com/wolfpld/tracy.git
+[submodule "thirdparty/FastNoise2"]
+	path = thirdparty/FastNoise2
+	url = https://github.com/Auburn/FastNoise2
