@@ -218,21 +218,25 @@ bool ChunkLoader::init()
 
 void ChunkLoader::pipe_chunk_results(std::vector<ChunkPtr>&& p_chunk_ptrs)
 {
-	std::vector<const ChunkData*> mixed_chunks;
-	mixed_chunks.reserve(p_chunk_ptrs.size());
+	std::vector<const ChunkData*> chunk_datas_to_mesh;
+	chunk_datas_to_mesh.reserve(p_chunk_ptrs.size());
+
+	TracyPlot("Chunks: Incoming Batch Size", static_cast<int64_t>(p_chunk_ptrs.size()));
 
 	for (ChunkPtr& chunk_ptr : p_chunk_ptrs)
 	{
 		const ChunkData* chunk_data = chunk_map->publish_chunk(std::move(chunk_ptr));
 		if (chunk_data && chunk_data->surface_state == SurfaceState::MIXED)
 		{
-			mixed_chunks.push_back(chunk_data);
+			chunk_datas_to_mesh.push_back(chunk_data);
 		}
 	}
 
-	if (!mixed_chunks.empty() && mesh_generator_pool->get_state() == ThreadPoolState::Ready)
+	TracyPlot("Chunks: Mixed Routed to MeshGen", static_cast<int64_t>(chunk_datas_to_mesh.size()));
+
+	if (!chunk_datas_to_mesh.empty() && mesh_generator_pool->get_state() == ThreadPoolState::Ready)
 	{
-		mesh_generator_pool->queue_task(std::move(mixed_chunks));
+		mesh_generator_pool->queue_task(std::move(chunk_datas_to_mesh));
 	}
 }
 
@@ -438,6 +442,16 @@ void ChunkLoader::update()
 			}
 		}
 	}
+
+	TracyPlot("Tasks: Chunk Gen Queue", static_cast<int64_t>(chunk_generator_pool->get_task_count()));
+	TracyPlot("Tasks: Mesh Gen Queue", static_cast<int64_t>(mesh_generator_pool->get_task_count()));
+	TracyPlot("Tasks: Collision Gen Queue", static_cast<int64_t>(collision_generator_pool->get_task_count()));
+
+	TracyPlot("Backlog: Pending Meshes", static_cast<int64_t>(mesh_datas.size()));
+	TracyPlot("Backlog: Pending Collisions", static_cast<int64_t>(collision_datas.size()));
+
+	TracyPlot("Pool: Active Chunk Nodes", static_cast<int64_t>(chunk_node_map.size()));
+	TracyPlot("Pool: Available Chunk Nodes", static_cast<int64_t>(chunk_node_pool.get_available_count()));
 }
 
 void ChunkLoader::stop()
