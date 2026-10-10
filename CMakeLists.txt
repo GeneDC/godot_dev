@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
 project(godot_dev)
 
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
 option(ENABLE_TRACY "Enable Tracy Profiler hooks" OFF)
 set(ENGINE_BIN_DIR "bin" CACHE STRING "Engine bin directory")
 
@@ -10,6 +12,7 @@ set(GD_ENGINE_EXE "${GD_ENGINE_DIR}/${ENGINE_BIN_DIR}/godot.windows.editor.dev.x
 set(GD_PROJECT_DIR "${CMAKE_SOURCE_DIR}/project")
 set(GD_CPP_DIR "${CMAKE_SOURCE_DIR}/godot-cpp")
 set(TRACY_DIR "${CMAKE_SOURCE_DIR}/thirdparty/tracy")
+set(FASTNOISE2_DIR "${CMAKE_SOURCE_DIR}/thirdparty/FastNoise2")
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_EXTENSIONS ON)
@@ -62,11 +65,39 @@ if(MSVC)
 	endif()
 endif()
 
+function(set_folder_recursive dir_path folder_name)
+	get_property(targets DIRECTORY "${dir_path}" PROPERTY BUILDSYSTEM_TARGETS)
+	foreach(tgt IN LISTS targets)
+		get_target_property(is_alias ${tgt} ALIASED_TARGET)
+		if(NOT is_alias)
+			set_target_properties(${tgt} PROPERTIES FOLDER "${folder_name}")
+		endif()
+	endforeach()
+
+	get_property(subdirs DIRECTORY "${dir_path}" PROPERTY SUBDIRECTORIES)
+	foreach(subdir IN LISTS subdirs)
+		set_folder_recursive("${subdir}" "${folder_name}")
+	endforeach()
+endfunction()
+
+# FastNoise2 integration
+if(EXISTS "${FASTNOISE2_DIR}/CMakeLists.txt")
+	message(STATUS "Adding FastNoise2 subdirectory")
+	set(FASTNOISE2_NOISETOOL OFF CACHE BOOL "" FORCE)
+	set(FASTNOISE2_TESTS OFF CACHE BOOL "" FORCE)
+
+	add_subdirectory("${FASTNOISE2_DIR}" "${CMAKE_BINARY_DIR}/thirdparty/FastNoise2" EXCLUDE_FROM_ALL)
+	set_folder_recursive("${FASTNOISE2_DIR}" "thirdparty/FastNoise2")
+else()
+	message(WARNING "FastNoise2 not found at ${FASTNOISE2_DIR}. Make sure it is cloned or checked out in thirdparty/FastNoise2.")
+endif()
+
 message(STATUS "Adding godot-cpp subdirectory")
 add_subdirectory(godot-cpp)
 
 # Force godot-cpp to output to its own folder instead of /build
 set_target_properties(godot-cpp PROPERTIES
+	FOLDER "thirdparty"
 	ARCHIVE_OUTPUT_DIRECTORY "${GD_CPP_DIR}/bin"
 	ARCHIVE_OUTPUT_DIRECTORY_DEV_BUILD "${GD_CPP_DIR}/bin"
 	ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${GD_CPP_DIR}/bin"
@@ -151,6 +182,13 @@ foreach(dir ${extension_dirs})
 
 			# Build settings
 			target_link_libraries(${ext_name} PRIVATE godot-cpp)
+			if(TARGET FastNoise2)
+				target_link_libraries(${ext_name} PRIVATE FastNoise2)
+			endif()
+			if(EXISTS "${FASTNOISE2_DIR}/include")
+				target_include_directories(${ext_name} PRIVATE "${FASTNOISE2_DIR}/include")
+			endif()
+
 			target_include_directories(${ext_name} PRIVATE ${current_ext_src})
 			
 			message(STATUS "Generating .gdextension for ${ext_name}")
