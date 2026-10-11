@@ -4,8 +4,10 @@ var chunk_loader : ChunkLoader
 var chunk_positions: Array[Vector3i] = []
 var is_init: bool = false
 
-@export var player_view_control: ViewControl
-@export var free_cam_view_control: ViewControl
+@export var player_character: CharacterBody3D
+@export var player_view_control: ViewControlComponent
+@export var free_cam_view_control: ViewControlComponent
+@export var player_simulation_control: SimulationControlComponent
 
 func _ready() -> void:
 	call_deferred("init")
@@ -22,11 +24,14 @@ func init() -> void:
 func _process(_delta_time: float) -> void:
 	if (chunk_loader.can_update()):
 		chunk_loader.update()
+		if player_simulation_control and not player_simulation_control.is_active:
+			if chunk_loader.is_ready():
+				player_simulation_control.activate()
 	_debug_update_grid()
 
 func _unhandled_input(_event: InputEvent) -> void:
 	if Input.is_action_just_pressed("toggle_free_cam"):
-		if player_view_control.is_view_active():
+		if player_view_control.is_active:
 			free_cam_view_control.activate()
 			player_view_control.deactivate()
 		else:

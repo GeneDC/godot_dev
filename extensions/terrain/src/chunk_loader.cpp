@@ -64,6 +64,12 @@ void ChunkLoader::_bind_methods()
 	ClassDB::bind_method(D_METHOD("can_init"), &ChunkLoader::can_init);
 	ClassDB::bind_method(D_METHOD("can_update"), &ChunkLoader::can_update);
 	ClassDB::bind_method(D_METHOD("can_stop"), &ChunkLoader::can_stop);
+	ClassDB::bind_method(D_METHOD("is_ready"), &ChunkLoader::is_ready);
+	ClassDB::bind_method(D_METHOD("get_state"), &ChunkLoader::get_state);
+
+	BIND_ENUM_CONSTANT(State::STATE_STOPPED);
+	BIND_ENUM_CONSTANT(State::STATE_READY);
+	BIND_ENUM_CONSTANT(State::STATE_STOPPING);
 
 	ClassDB::bind_method(D_METHOD("modify_terrain_sphere", "global_position", "radius", "is_subtract"), &ChunkLoader::modify_terrain_sphere);
 
@@ -88,7 +94,7 @@ bool ChunkLoader::init()
 {
 	ZoneScoped;
 
-	if (state != State::Stopped)
+	if (state != State::STATE_STOPPED)
 	{
 		PRINT_ERROR("Chunk Loader is already initialised or is stopping.");
 		return false;
@@ -231,7 +237,7 @@ bool ChunkLoader::init()
 				});
 	}
 
-	state = State::Ready;
+	state = State::STATE_READY;
 	return true;
 }
 
@@ -312,7 +318,7 @@ void ChunkLoader::update()
 		return;
 	}
 
-	if (state != State::Ready)
+	if (state != State::STATE_READY)
 	{
 		PRINT_ERROR("Chunk Loader is not Ready");
 		return;
@@ -481,13 +487,13 @@ void ChunkLoader::update()
 
 void ChunkLoader::stop()
 {
-	if (state != State::Ready)
+	if (state != State::STATE_READY)
 	{
 		PRINT_ERROR("Trying to stop when Chunk Loader is stopped or already stopping.");
 		return;
 	}
 
-	state = State::Stopping;
+	state = State::STATE_STOPPING;
 
 	mesh_generator_pool->stop(); // Blocks execution until all threads are stopped
 	chunk_generator_pool->stop();
@@ -507,7 +513,7 @@ void ChunkLoader::stop()
 	}
 	collision_datas.clear();
 
-	state = State::Stopped;
+	state = State::STATE_STOPPED;
 }
 
 void ChunkLoader::try_update_chunks()

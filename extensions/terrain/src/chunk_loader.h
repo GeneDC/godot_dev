@@ -42,11 +42,11 @@ class ChunkLoader : public Node
 	GDCLASS(ChunkLoader, Node)
 
 public:
-	enum class State : uint8_t
+	enum State : uint8_t
 	{
-		Stopped,
-		Ready,
-		Stopping
+		STATE_STOPPED,
+		STATE_READY,
+		STATE_STOPPING
 	};
 
 	bool init();
@@ -55,9 +55,10 @@ public:
 
 	void unload_all();
 
-	bool can_init() const { return state == State::Stopped; }
-	bool can_update() const { return state == State::Ready; }
-	bool can_stop() const { return state == State::Ready; }
+	bool can_init() const { return state == State::STATE_STOPPED; }
+	bool can_update() const { return state == State::STATE_READY; }
+	bool can_stop() const { return state == State::STATE_READY; }
+	bool is_ready() const { return state == State::STATE_READY; }
 
 	Ref<ChunkGeneratorSettings> chunk_generator_settings;
 	Ref<MeshGeneratorSettings> mesh_generator_settings;
@@ -107,7 +108,7 @@ private:
 
 	ChunkNode* _create_chunk_node(Vector3i chunk_pos);
 
-	State state = State::Stopped;
+	State state = State::STATE_STOPPED;
 
 	std::shared_ptr<ConcurrentChunkMap> chunk_map;
 	ChunkScavenger chunk_scavenger;
@@ -134,3 +135,5 @@ private:
 
 	WorkerThreadPool::TaskID update_chunks_task_id{ WorkerThreadPool::INVALID_TASK_ID };
 };
+
+VARIANT_ENUM_CAST(ChunkLoader::State);

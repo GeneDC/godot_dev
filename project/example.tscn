@@ -2,9 +2,11 @@
 
 [ext_resource type="Script" uid="uid://bi504r0doyid6" path="res://scripts/example.gd" id="1_n51mc"]
 [ext_resource type="Script" uid="uid://c7561n2mnt1m4" path="res://scripts/FreeCamera.gd" id="2_n51mc"]
+[ext_resource type="Script" uid="uid://di0a1q63rw4et" path="res://scripts/InputControlComponent.gd" id="4_ugfer"]
 [ext_resource type="Script" uid="uid://buu17emdnajmp" path="res://scripts/PlayerCharacter.gd" id="5_ei00m"]
+[ext_resource type="Script" uid="uid://bqjibyldlkkaw" path="res://scripts/SimulationControlComponent.gd" id="6_kkclv"]
 [ext_resource type="Script" uid="uid://c8ptxv1o1dc6s" path="res://scripts/ChunkViewerAutoRegister.gd" id="6_rujmf"]
-[ext_resource type="Script" uid="uid://bwob5lwa8nf23" path="res://scripts/ViewControl.gd" id="6_ugfer"]
+[ext_resource type="Script" uid="uid://bwob5lwa8nf23" path="res://scripts/ViewControlComponent.gd" id="6_ugfer"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ugfer"]
 
@@ -22,11 +24,14 @@ transform = Transform3D(1, 0, 0, 0, -0.3391156, 0.9407447, 0, -0.9407447, -0.339
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.495, 20, 5.713)
 script = ExtResource("2_n51mc")
 
-[node name="ViewControl" type="Node" parent="Camera3D" unique_id=200469701 node_paths=PackedStringArray("camera", "controlled_node")]
+[node name="ViewControl" type="Node" parent="Camera3D" unique_id=200469701]
 script = ExtResource("6_ugfer")
-camera = NodePath("..")
-controlled_node = NodePath("..")
+mouse_mode = 0
 metadata/_custom_type_script = "uid://bwob5lwa8nf23"
+
+[node name="InputControllerComponent" type="Node" parent="Camera3D" unique_id=1177076330]
+script = ExtResource("4_ugfer")
+metadata/_custom_type_script = "uid://di0a1q63rw4et"
 
 [node name="CharacterBody3D" type="CharacterBody3D" parent="." unique_id=129912867]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 15, 0)
@@ -44,12 +49,19 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 [node name="RayCast3D" type="RayCast3D" parent="CharacterBody3D/Camera3D" unique_id=1402078127]
 target_position = Vector3(0, 0, -10)
 
-[node name="ViewControl" type="Node" parent="CharacterBody3D" unique_id=136085309 node_paths=PackedStringArray("camera", "controlled_node")]
+[node name="ViewControl" type="Node" parent="CharacterBody3D" unique_id=136085309]
 script = ExtResource("6_ugfer")
-camera = NodePath("../Camera3D")
-controlled_node = NodePath("..")
 activate_on_ready = true
 metadata/_custom_type_script = "uid://bwob5lwa8nf23"
+
+[node name="InputControllerComponent" type="Node" parent="CharacterBody3D" unique_id=1308215220]
+script = ExtResource("4_ugfer")
+active_on_ready = true
+metadata/_custom_type_script = "uid://di0a1q63rw4et"
+
+[node name="SimulationControlComponent" type="Node" parent="CharacterBody3D" unique_id=1054728653]
+script = ExtResource("6_kkclv")
+metadata/_custom_type_script = "uid://bqjibyldlkkaw"
 
 [node name="ChunkViewer" type="ChunkViewer" parent="CharacterBody3D" unique_id=1543508269]
 script = ExtResource("6_rujmf")

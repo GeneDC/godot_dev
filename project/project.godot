@@ -23,6 +23,7 @@ config/icon="res://icon.svg"
 
 GlobalChunkLoader="*res://chunk_loader.tscn"
 GlobalDebugInfo="*res://debug_info.tscn"
+GGUtils="*uid://c0w3ff03aw8wf"
 
 [debug]
 
