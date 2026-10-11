@@ -26,6 +26,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <tracy/Tracy.hpp>
 
 using namespace godot;
 using namespace terrain_constants;
@@ -175,6 +176,8 @@ bool MeshGenerator::init()
 
 MeshData MeshGenerator::process_task(const ChunkData* chunk_data)
 {
+	ZoneScopedN("MeshGenerator::process_task");
+
 	MeshData mesh_data{};
 	mesh_data.chunk_pos = chunk_data->position;
 	mesh_data.revision = chunk_data->revision;
