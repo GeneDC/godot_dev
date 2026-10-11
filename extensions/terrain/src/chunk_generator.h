@@ -11,29 +11,19 @@
 #include <godot_cpp/core/binder_common.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/variant/string.hpp>
-#include <godot_cpp/variant/vector2i.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
-#include <FastNoise/Utility/SmartNode.h>
 #include <FastNoise/Generators/Generator.h>
+#include <FastNoise/Utility/SmartNode.h>
 #include <array>
-#include <list>
 
 using namespace godot;
-
-constexpr int HEIGHT_MAP_CACHE_PER_THREAD = 256;
 
 class ChunkGeneratorSettings : public Resource
 {
 	GDCLASS(ChunkGeneratorSettings, Resource)
 
 public:
-	enum GenerationMode
-	{
-		HEIGHTMAP_2D = 0,
-		DENSITY_3D = 1
-	};
-
 	ChunkGeneratorSettings();
 	virtual ~ChunkGeneratorSettings() = default;
 
@@ -42,7 +32,6 @@ public:
 	float base_height_multiplier = 1.0f;
 	float base_frequency = 0.005f;
 	float multiplier_frequency = 0.001f;
-	GenerationMode generation_mode = DENSITY_3D;
 	String encoded_node_tree = "";
 
 	void rebuild_nodes();
@@ -69,9 +58,6 @@ protected:
 	float get_multiplier_frequency() const { return multiplier_frequency; }
 	void set_multiplier_frequency(float p_frequency);
 
-	int get_generation_mode() const { return static_cast<int>(generation_mode); }
-	void set_generation_mode(int p_mode) { generation_mode = static_cast<GenerationMode>(p_mode); }
-
 	String get_encoded_node_tree() const { return encoded_node_tree; }
 	void set_encoded_node_tree(const String& p_encoded_tree);
 
@@ -79,8 +65,6 @@ private:
 	FastNoise::SmartNode<> base_noise_node;
 	FastNoise::SmartNode<> multiplier_noise_node;
 };
-
-VARIANT_ENUM_CAST(ChunkGeneratorSettings::GenerationMode);
 
 class ChunkGenerator final : public ITaskProcessor<ChunkPtr, ChunkPtr>
 {
@@ -114,23 +98,12 @@ protected:
 	static void _bind_methods() {}
 
 private:
-	bool generate_height_map(const Vector3& p_chunk_world_pos) const;
 	bool generate_3d_density(ChunkPtr& chunk_ptr, const Vector3& p_chunk_world_pos) const;
-	void generate_from_height_map(ChunkPtr& chunk_ptr, const Vector3& p_chunk_world_pos) const;
 
 	Ref<ChunkGeneratorSettings> settings;
 	FastNoise::SmartNode<> base_noise_node;
 	FastNoise::SmartNode<> multiplier_noise_node;
 
 	alignas(64) static thread_local float uint8_to_float[256];
-	struct alignas(64) HeightMap
-	{
-		Vector2i position;
-		std::array<float, terrain_constants::POINTS_AREA> data{};
-	};
-	alignas(64) static thread_local HeightMap* tl_height_map;
-	alignas(64) static thread_local std::list<HeightMap> tl_height_map_cache;
-	alignas(64) static thread_local std::array<float, terrain_constants::POINTS_AREA> tl_scratch_base;
-	alignas(64) static thread_local std::array<float, terrain_constants::POINTS_AREA> tl_scratch_multiplier;
 	alignas(64) static thread_local std::array<float, terrain_constants::POINTS_VOLUME> tl_scratch_volume;
 };
