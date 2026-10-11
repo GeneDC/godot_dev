@@ -4,17 +4,18 @@
 #include "chunk_data.h"
 #include "terrain_constants.h"
 
-#include <FastNoise/FastNoise.h>
-
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/wrapped.hpp>
+#include <godot_cpp/core/binder_common.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/vector2i.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
+#include <FastNoise/Utility/SmartNode.h>
+#include <FastNoise/Generators/Generator.h>
 #include <array>
 #include <list>
 
@@ -27,6 +28,12 @@ class ChunkGeneratorSettings : public Resource
 	GDCLASS(ChunkGeneratorSettings, Resource)
 
 public:
+	enum GenerationMode
+	{
+		HEIGHTMAP_2D = 0,
+		DENSITY_3D = 1
+	};
+
 	ChunkGeneratorSettings();
 	virtual ~ChunkGeneratorSettings() = default;
 
@@ -35,9 +42,12 @@ public:
 	float base_height_multiplier = 1.0f;
 	float base_frequency = 0.005f;
 	float multiplier_frequency = 0.001f;
+	GenerationMode generation_mode = DENSITY_3D;
 	String encoded_node_tree = "";
 
 	void rebuild_nodes();
+	FastNoise::SmartNode<> create_base_node() const;
+	FastNoise::SmartNode<> create_multiplier_node() const;
 	FastNoise::SmartNode<> get_base_noise_node() const { return base_noise_node; }
 	FastNoise::SmartNode<> get_multiplier_noise_node() const { return multiplier_noise_node; }
 
@@ -59,6 +69,9 @@ protected:
 	float get_multiplier_frequency() const { return multiplier_frequency; }
 	void set_multiplier_frequency(float p_frequency);
 
+	int get_generation_mode() const { return static_cast<int>(generation_mode); }
+	void set_generation_mode(int p_mode) { generation_mode = static_cast<GenerationMode>(p_mode); }
+
 	String get_encoded_node_tree() const { return encoded_node_tree; }
 	void set_encoded_node_tree(const String& p_encoded_tree);
 
@@ -66,6 +79,8 @@ private:
 	FastNoise::SmartNode<> base_noise_node;
 	FastNoise::SmartNode<> multiplier_noise_node;
 };
+
+VARIANT_ENUM_CAST(ChunkGeneratorSettings::GenerationMode);
 
 class ChunkGenerator final : public ITaskProcessor<ChunkPtr, ChunkPtr>
 {
@@ -80,10 +95,9 @@ public:
 		Ref<ChunkGenerator> chunk_generator = memnew((ChunkGenerator));
 		if (p_settings.is_valid())
 		{
-			p_settings->rebuild_nodes();
 			chunk_generator->settings = p_settings->duplicate(true);
-			chunk_generator->base_noise_node = p_settings->get_base_noise_node();
-			chunk_generator->multiplier_noise_node = p_settings->get_multiplier_noise_node();
+			chunk_generator->base_noise_node = p_settings->create_base_node();
+			chunk_generator->multiplier_noise_node = p_settings->create_multiplier_node();
 		}
 
 		for (int i = 0; i < 256; ++i)
@@ -100,20 +114,23 @@ protected:
 	static void _bind_methods() {}
 
 private:
-	static thread_local float uint8_to_float[256];
 	bool generate_height_map(const Vector3& p_chunk_world_pos) const;
+	bool generate_3d_density(ChunkPtr& chunk_ptr, const Vector3& p_chunk_world_pos) const;
+	void generate_from_height_map(ChunkPtr& chunk_ptr, const Vector3& p_chunk_world_pos) const;
 
 	Ref<ChunkGeneratorSettings> settings;
 	FastNoise::SmartNode<> base_noise_node;
 	FastNoise::SmartNode<> multiplier_noise_node;
 
+	alignas(64) static thread_local float uint8_to_float[256];
 	struct alignas(64) HeightMap
 	{
 		Vector2i position;
 		std::array<float, terrain_constants::POINTS_AREA> data{};
 	};
-	static thread_local HeightMap* tl_height_map;
-	static thread_local std::list<HeightMap> tl_height_map_cache;
-	static thread_local std::array<float, terrain_constants::POINTS_AREA> tl_scratch_base;
-	static thread_local std::array<float, terrain_constants::POINTS_AREA> tl_scratch_multiplier;
+	alignas(64) static thread_local HeightMap* tl_height_map;
+	alignas(64) static thread_local std::list<HeightMap> tl_height_map_cache;
+	alignas(64) static thread_local std::array<float, terrain_constants::POINTS_AREA> tl_scratch_base;
+	alignas(64) static thread_local std::array<float, terrain_constants::POINTS_AREA> tl_scratch_multiplier;
+	alignas(64) static thread_local std::array<float, terrain_constants::POINTS_VOLUME> tl_scratch_volume;
 };

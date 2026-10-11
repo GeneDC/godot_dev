@@ -10,14 +10,21 @@
 #include <godot_cpp/core/print_string.hpp>
 #include <godot_cpp/core/property_info.hpp>
 #include <godot_cpp/variant/char_string.hpp>
+#include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/variant.hpp>
 #include <godot_cpp/variant/vector2i.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
 
 #include <FastNoise/FastNoise.h>
+#include <FastNoise/Generators/Fractal.h>
+#include <FastNoise/Generators/Simplex.h>
+
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <iterator>
 #include <list>
 #include <tracy/Tracy.hpp>
@@ -31,34 +38,62 @@ ChunkGeneratorSettings::ChunkGeneratorSettings()
 	rebuild_nodes();
 }
 
-void ChunkGeneratorSettings::rebuild_nodes()
+FastNoise::SmartNode<> ChunkGeneratorSettings::create_base_node() const
 {
+	FastSIMD::FeatureSet cpu_max_simd = FastSIMD::DetectCpuMaxFeatureSet();
+	//print_line(itos(static_cast<int>(cpu_max_simd)));
+
 	if (!encoded_node_tree.is_empty())
 	{
 		CharString utf8 = encoded_node_tree.utf8();
-		base_noise_node = FastNoise::NewFromEncodedNodeTree(utf8.get_data());
-		if (base_noise_node)
+		FastNoise::SmartNode<> node = FastNoise::NewFromEncodedNodeTree(utf8.get_data(), cpu_max_simd);
+		if (node)
 		{
-			multiplier_noise_node = nullptr;
-			return;
+			return node;
 		}
 	}
 
-	auto simplex = FastNoise::New<FastNoise::Simplex>();
-	auto fractal_fb_m = FastNoise::New<FastNoise::FractalFBm>();
+	auto simplex = FastNoise::New<FastNoise::Simplex>(cpu_max_simd);
+	auto fractal_fb_m = FastNoise::New<FastNoise::FractalFBm>(cpu_max_simd);
 	fractal_fb_m->SetSource(simplex);
 	fractal_fb_m->SetOctaveCount(4);
 	fractal_fb_m->SetGain(0.5f);
 	fractal_fb_m->SetLacunarity(2.0f);
-	base_noise_node = fractal_fb_m;
+	return fractal_fb_m;
+}
 
-	auto mult_simplex = FastNoise::New<FastNoise::Simplex>();
-	auto mult_fractal = FastNoise::New<FastNoise::FractalFBm>();
+FastNoise::SmartNode<> ChunkGeneratorSettings::create_multiplier_node() const
+{
+	if (!encoded_node_tree.is_empty())
+	{
+		return nullptr;
+	}
+
+	FastSIMD::FeatureSet cpu_max_simd = FastSIMD::DetectCpuMaxFeatureSet();
+	auto mult_simplex = FastNoise::New<FastNoise::Simplex>(cpu_max_simd);
+	auto mult_fractal = FastNoise::New<FastNoise::FractalFBm>(cpu_max_simd);
 	mult_fractal->SetSource(mult_simplex);
 	mult_fractal->SetOctaveCount(3);
 	mult_fractal->SetGain(0.5f);
 	mult_fractal->SetLacunarity(2.0f);
-	multiplier_noise_node = mult_fractal;
+	return mult_fractal;
+}
+
+void ChunkGeneratorSettings::rebuild_nodes()
+{
+	if (!encoded_node_tree.is_empty())
+	{
+		base_noise_node = create_base_node();
+		if (base_noise_node)
+		{
+			multiplier_noise_node = nullptr;
+			generation_mode = DENSITY_3D;
+			return;
+		}
+	}
+
+	base_noise_node = create_base_node();
+	multiplier_noise_node = create_multiplier_node();
 }
 
 void ChunkGeneratorSettings::set_seed(int p_seed)
@@ -84,9 +119,16 @@ void ChunkGeneratorSettings::set_encoded_node_tree(const String& p_encoded_tree)
 
 void ChunkGeneratorSettings::_bind_methods()
 {
+	BIND_ENUM_CONSTANT(HEIGHTMAP_2D);
+	BIND_ENUM_CONSTANT(DENSITY_3D);
+
 	ClassDB::bind_method(D_METHOD("get_seed"), &ChunkGeneratorSettings::get_seed);
 	ClassDB::bind_method(D_METHOD("set_seed", "seed"), &ChunkGeneratorSettings::set_seed);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "seed"), "set_seed", "get_seed");
+
+	ClassDB::bind_method(D_METHOD("get_generation_mode"), &ChunkGeneratorSettings::get_generation_mode);
+	ClassDB::bind_method(D_METHOD("set_generation_mode", "generation_mode"), &ChunkGeneratorSettings::set_generation_mode);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "generation_mode", PROPERTY_HINT_ENUM, "Heightmap 2D,Density 3D"), "set_generation_mode", "get_generation_mode");
 
 	ClassDB::bind_method(D_METHOD("get_base_height_offset"), &ChunkGeneratorSettings::get_base_height_offset);
 	ClassDB::bind_method(D_METHOD("set_base_height_offset", "base_height_offset"), &ChunkGeneratorSettings::set_base_height_offset);
@@ -109,11 +151,12 @@ void ChunkGeneratorSettings::_bind_methods()
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "encoded_node_tree", PROPERTY_HINT_MULTILINE_TEXT), "set_encoded_node_tree", "get_encoded_node_tree");
 }
 
-thread_local float ChunkGenerator::uint8_to_float[256];
-thread_local ChunkGenerator::HeightMap* ChunkGenerator::tl_height_map = nullptr;
-thread_local std::list<ChunkGenerator::HeightMap> ChunkGenerator::tl_height_map_cache;
-thread_local std::array<float, terrain_constants::POINTS_AREA> ChunkGenerator::tl_scratch_base{};
-thread_local std::array<float, terrain_constants::POINTS_AREA> ChunkGenerator::tl_scratch_multiplier{};
+alignas(64) thread_local float ChunkGenerator::uint8_to_float[256];
+alignas(64) thread_local ChunkGenerator::HeightMap* ChunkGenerator::tl_height_map = nullptr;
+alignas(64) thread_local std::list<ChunkGenerator::HeightMap> ChunkGenerator::tl_height_map_cache;
+alignas(64) thread_local std::array<float, terrain_constants::POINTS_AREA> ChunkGenerator::tl_scratch_base{};
+alignas(64) thread_local std::array<float, terrain_constants::POINTS_AREA> ChunkGenerator::tl_scratch_multiplier{};
+alignas(64) thread_local std::array<float, terrain_constants::POINTS_VOLUME> ChunkGenerator::tl_scratch_volume{};
 
 ChunkPtr ChunkGenerator::process_task(ChunkPtr chunk_ptr)
 {
@@ -122,36 +165,26 @@ ChunkPtr ChunkGenerator::process_task(ChunkPtr chunk_ptr)
 	chunk_ptr->surface_sum = 0;
 	chunk_ptr->revision++;
 
-	Vector3 chunk_world_pos = chunk_ptr->position * CHUNK_SIZE;
-	bool did_generate_height_map = generate_height_map(chunk_world_pos);
-	if (!did_generate_height_map)
-	{
-		chunk_ptr->surface_state = SurfaceState::EMPTY;
-		return std::move(chunk_ptr);
-	}
-	const float* height_map_ptr = tl_height_map->data.data();
-	uint8_t* points_ptr = chunk_ptr->points.data();
+	const Vector3 chunk_world_pos = chunk_ptr->position * CHUNK_SIZE;
 
-	for (int z = 0; z < POINTS_SIZE; z++)
+	if (settings.is_valid() && settings->generation_mode == ChunkGeneratorSettings::DENSITY_3D)
 	{
-		const int world_z = z + chunk_world_pos.z;
-		for (int y = 0; y < POINTS_SIZE; y++)
+		if (!generate_3d_density(chunk_ptr, chunk_world_pos))
 		{
-			const int world_y = y + chunk_world_pos.y;
-
-			for (int x = 0; x < POINTS_SIZE; x++)
-			{
-				const int world_x = x + chunk_world_pos.x;
-				float height = height_map_ptr[x + z * POINTS_SIZE];
-
-				float value = height - world_y;
-				value = (value < 0.0f) ? 0.0f : (value > 1.0f ? 1.0f : value); // CLAMP 0-1
-
-				uint8_t int_value = static_cast<uint8_t>(value * 255.0f + 0.5f);
-				chunk_ptr->surface_sum += int_value;
-				points_ptr[x + y * POINTS_SIZE + z * POINTS_AREA] = int_value;
-			}
+			chunk_ptr->surface_state = SurfaceState::EMPTY;
+			return std::move(chunk_ptr);
 		}
+	}
+	else
+	{
+		bool did_generate_height_map = generate_height_map(chunk_world_pos);
+		if (!did_generate_height_map)
+		{
+			chunk_ptr->surface_state = SurfaceState::EMPTY;
+			return std::move(chunk_ptr);
+		}
+
+		generate_from_height_map(chunk_ptr, chunk_world_pos);
 	}
 
 	if (chunk_ptr->surface_sum == 0)
@@ -168,6 +201,95 @@ ChunkPtr ChunkGenerator::process_task(ChunkPtr chunk_ptr)
 	}
 
 	return std::move(chunk_ptr);
+}
+
+bool ChunkGenerator::generate_3d_density(ChunkPtr& chunk_ptr, const Vector3& p_chunk_world_pos) const
+{
+	ZoneScopedN("ChunkGenerator::generate_3d_density");
+
+	if (!base_noise_node)
+	{
+		print_error("base_noise_node is invalid");
+		return false;
+	}
+
+	const int seed = settings.is_valid() ? settings->seed : 1337;
+	const float freq = settings.is_valid() ? settings->base_frequency : 0.005f;
+
+	FastNoise::OutputMinMax min_max;
+	{
+		ZoneNamedN(zoneGenUniformGrid3D, "GenUniformGrid3D", true);
+		min_max = base_noise_node->GenUniformGrid3D(
+				tl_scratch_volume.data(),
+				p_chunk_world_pos.x * freq,
+				p_chunk_world_pos.y * freq,
+				p_chunk_world_pos.z * freq,
+				POINTS_SIZE, POINTS_SIZE, POINTS_SIZE,
+				freq, freq, freq,
+				seed);
+	}
+
+	// Early out if entire volume is air (<= -1.0f) or solid (>= 1.0f)
+	if (min_max.max <= -1.0f)
+	{
+		std::memset(chunk_ptr->points.data(), 0, POINTS_VOLUME);
+		chunk_ptr->surface_sum = 0;
+		return true;
+	}
+	if (min_max.min >= 1.0f)
+	{
+		std::memset(chunk_ptr->points.data(), 255, POINTS_VOLUME);
+		chunk_ptr->surface_sum = FULL_POINTS_SUM;
+		return true;
+	}
+
+	const float* float_density_ptr = tl_scratch_volume.data();
+	uint8_t* points_ptr = chunk_ptr->points.data();
+	uint32_t sum = 0;
+
+	{
+		ZoneNamedN(zoneUint8Conversion, "Uint8Conversion", true);
+		for (size_t i = 0; i < POINTS_VOLUME; ++i)
+		{
+			float val = (float_density_ptr[i] + 1.0f) * 127.5f;
+			float clamped_val = std::clamp(val, 0.0f, 255.0f);
+			uint8_t int_value = static_cast<uint8_t>(clamped_val + 0.5f);
+			points_ptr[i] = int_value;
+			sum += int_value;
+		}
+	}
+
+	chunk_ptr->surface_sum = sum;
+	return true;
+}
+
+void ChunkGenerator::generate_from_height_map(ChunkPtr& chunk_ptr, const Vector3& p_chunk_world_pos) const
+{
+	const float* height_map_ptr = tl_height_map->data.data();
+	uint8_t* points_ptr = chunk_ptr->points.data();
+	uint32_t sum = 0;
+
+	for (int z = 0; z < POINTS_SIZE; z++)
+	{
+		for (int y = 0; y < POINTS_SIZE; y++)
+		{
+			const int world_y = y + static_cast<int>(p_chunk_world_pos.y);
+
+			for (int x = 0; x < POINTS_SIZE; x++)
+			{
+				float height = height_map_ptr[x + z * POINTS_SIZE];
+
+				float value = height - world_y;
+				value = (value < 0.0f) ? 0.0f : (value > 1.0f ? 1.0f : value);
+
+				uint8_t int_value = static_cast<uint8_t>(value * 255.0f + 0.5f);
+				sum += int_value;
+				points_ptr[x + y * POINTS_SIZE + z * POINTS_AREA] = int_value;
+			}
+		}
+	}
+
+	chunk_ptr->surface_sum = sum;
 }
 
 bool ChunkGenerator::generate_height_map(const Vector3& p_chunk_world_pos) const
