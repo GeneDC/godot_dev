@@ -12,10 +12,12 @@
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_rujmf"]
 
-[node name="Node" type="Node" unique_id=1284362478 node_paths=PackedStringArray("player_view_control", "free_cam_view_control")]
+[node name="Node" type="Node" unique_id=1284362478 node_paths=PackedStringArray("player_character", "player_view_control", "free_cam_view_control", "player_simulation_control")]
 script = ExtResource("1_n51mc")
+player_character = NodePath("CharacterBody3D")
 player_view_control = NodePath("CharacterBody3D/ViewControl")
 free_cam_view_control = NodePath("Camera3D/ViewControl")
+player_simulation_control = NodePath("CharacterBody3D/SimulationControlComponent")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1926808519]
 transform = Transform3D(1, 0, 0, 0, -0.3391156, 0.9407447, 0, -0.9407447, -0.3391156, 0.8409251, 52.441833, 0)
@@ -61,6 +63,7 @@ metadata/_custom_type_script = "uid://di0a1q63rw4et"
 
 [node name="SimulationControlComponent" type="Node" parent="CharacterBody3D" unique_id=1054728653]
 script = ExtResource("6_kkclv")
+activate_on_ready = false
 metadata/_custom_type_script = "uid://bqjibyldlkkaw"
 
 [node name="ChunkViewer" type="ChunkViewer" parent="CharacterBody3D" unique_id=1543508269]

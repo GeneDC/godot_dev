@@ -67,6 +67,8 @@ void ChunkLoader::_bind_methods()
 	ClassDB::bind_method(D_METHOD("is_ready"), &ChunkLoader::is_ready);
 	ClassDB::bind_method(D_METHOD("get_state"), &ChunkLoader::get_state);
 
+	ClassDB::bind_method(D_METHOD("has_chunk_collision_at", "global_position"), &ChunkLoader::has_chunk_collision_at);
+
 	BIND_ENUM_CONSTANT(State::STATE_STOPPED);
 	BIND_ENUM_CONSTANT(State::STATE_READY);
 	BIND_ENUM_CONSTANT(State::STATE_STOPPING);
@@ -848,6 +850,23 @@ ChunkNode* ChunkLoader::get_chunk_node(Vector3i chunk_pos)
 	}
 
 	return nullptr;
+}
+
+bool ChunkLoader::has_chunk_collision_at(Vector3 global_position) const
+{
+	const Vector3i chunk_pos{
+		static_cast<int32_t>(Math::floor(global_position.x / CHUNK_SIZE)),
+		static_cast<int32_t>(Math::floor(global_position.y / CHUNK_SIZE)),
+		static_cast<int32_t>(Math::floor(global_position.z / CHUNK_SIZE))
+	};
+
+	auto it = chunk_node_map.find(chunk_pos);
+	if (it == chunk_node_map.end() || !it->value)
+	{
+		return false;
+	}
+
+	return it->value->get_collision_revision() > 0;
 }
 
 ChunkViewer* ChunkLoader::get_chunk_viewer() const

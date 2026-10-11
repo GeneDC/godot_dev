@@ -60,6 +60,8 @@ public:
 	bool can_stop() const { return state == State::STATE_READY; }
 	bool is_ready() const { return state == State::STATE_READY; }
 
+	bool has_chunk_collision_at(Vector3 global_position) const;
+
 	Ref<ChunkGeneratorSettings> chunk_generator_settings;
 	Ref<MeshGeneratorSettings> mesh_generator_settings;
 

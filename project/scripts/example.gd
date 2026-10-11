@@ -24,9 +24,15 @@ func init() -> void:
 func _process(_delta_time: float) -> void:
 	if (chunk_loader.can_update()):
 		chunk_loader.update()
-		if player_simulation_control and not player_simulation_control.is_active:
-			if chunk_loader.is_ready():
-				player_simulation_control.activate()
+		
+		# Active the player's simulation once we have collision generated in it's initial chunk
+		if (player_simulation_control and not player_simulation_control.is_active):
+			if (chunk_loader.is_ready() and player_character):
+				if (chunk_loader.has_chunk_collision_at(player_character.global_position)):
+					# Wait an extra second just to be sure
+					await get_tree().create_timer(1.0).timeout
+					player_simulation_control.activate()
+
 	_debug_update_grid()
 
 func _unhandled_input(_event: InputEvent) -> void:
