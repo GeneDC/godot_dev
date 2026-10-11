@@ -17,10 +17,12 @@
 
 #include <FastNoise/FastNoise.h>
 #include <FastNoise/Generators/Fractal.h>
+#include <FastNoise/Generators/Generator.h>
 #include <FastNoise/Generators/Simplex.h>
+#include <FastNoise/Utility/SmartNode.h>
+#include <FastSIMD/Utility/FeatureEnums.h>
 #include <algorithm>
 #include <array>
-#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <tracy/Tracy.hpp>
@@ -39,7 +41,6 @@ FastNoise::SmartNode<> ChunkGeneratorSettings::create_base_node() const
 	ZoneScoped;
 
 	FastSIMD::FeatureSet cpu_max_simd = FastSIMD::DetectCpuMaxFeatureSet();
-	//print_line(itos(static_cast<int>(cpu_max_simd)));
 
 	if (!encoded_node_tree.is_empty())
 	{
