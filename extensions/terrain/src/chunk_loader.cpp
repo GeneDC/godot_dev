@@ -154,7 +154,7 @@ bool ChunkLoader::init()
 
 	if (mesh_generator_pool->get_state() == ThreadPoolState::Stopped)
 	{
-		constexpr int64_t mesh_generator_thread_count = 1;
+		constexpr int64_t mesh_generator_thread_count = 4;
 		mesh_generator_pool->init(
 				mesh_generator_thread_count,
 				"MeshGen",
@@ -176,7 +176,7 @@ bool ChunkLoader::init()
 
 	if (chunk_generator_pool->get_state() == ThreadPoolState::Stopped)
 	{
-		constexpr int64_t chunk_generator_thread_count = 8;
+		constexpr int64_t chunk_generator_thread_count = 4;
 		chunk_generator_pool->init(
 				chunk_generator_thread_count,
 				"ChunkGen",
@@ -539,7 +539,7 @@ void ChunkLoader::_update_chunks()
 	// TODO: implement save/load chunks to/from disc. Only save chunks that have been "simulated" since loading.
 
 	std::vector<Vector3i> generate_positions;
-	constexpr int64_t CHUNK_GEN_BATCH_SIZE = 128;
+	constexpr int64_t CHUNK_GEN_BATCH_SIZE = 1024;
 	chunk_viewer->get_chunk_positions(generate_positions, CHUNK_GEN_BATCH_SIZE);
 	{
 		ZoneNamedN(zoneQueueChunksForGeneration, "Queue chunks for generation", true);
