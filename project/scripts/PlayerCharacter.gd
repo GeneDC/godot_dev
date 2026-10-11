@@ -65,6 +65,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if Input.is_action_just_pressed("toggle_gravity"):
 		is_gravity_on = not is_gravity_on;
+		velocity = velocity * Vector3(1.0, 0.0, 1.0)
 	
 	input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	
