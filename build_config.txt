@@ -1,2 +1,4 @@
 # Set to ON/OFF to enable/disable Tracy Profiler
 ENABLE_TRACY=OFF
+# Set to ON/OFF to enable/disable Optimisations in FastNoise2. Generally leave it optimised as it is near unusable in debug otherwise.
+FASTNOISE2_FORCE_OPTIMISE=ON

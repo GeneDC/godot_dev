@@ -4,6 +4,8 @@ project(godot_dev)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 option(ENABLE_TRACY "Enable Tracy Profiler hooks" OFF)
+option(FASTNOISE2_FORCE_OPTIMISE "Force /O2 optimisations for FastNoise2 on MSVC debug builds" ON)
+
 set(ENGINE_BIN_DIR "bin" CACHE STRING "Engine bin directory")
 
 set(GD_ENGINE_VERSION "4.6")
@@ -87,7 +89,7 @@ if(EXISTS "${FASTNOISE2_DIR}/CMakeLists.txt")
 	set(FASTNOISE2_TESTS OFF CACHE BOOL "" FORCE)
 
 	# Stash flags and force O2/Ob2 without RTC for FastNoise2
-	if(MSVC)
+	if(MSVC AND FASTNOISE2_FORCE_OPTIMISE)
 		set(_SAVED_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
 		set(_SAVED_CXX_FLAGS_DEV_BUILD "${CMAKE_CXX_FLAGS_DEV_BUILD}")
 		string(REGEX REPLACE "/RTC[1su]+" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
@@ -99,7 +101,7 @@ if(EXISTS "${FASTNOISE2_DIR}/CMakeLists.txt")
 	add_subdirectory("${FASTNOISE2_DIR}" "${CMAKE_BINARY_DIR}/thirdparty/FastNoise2" EXCLUDE_FROM_ALL)
 	set_folder_recursive("${FASTNOISE2_DIR}" "thirdparty/FastNoise2")
 
-	if(MSVC)
+	if(MSVC AND FASTNOISE2_FORCE_OPTIMISE)
 		set(CMAKE_CXX_FLAGS_DEBUG "${_SAVED_CXX_FLAGS_DEBUG}")
 		set(CMAKE_CXX_FLAGS_DEV_BUILD "${_SAVED_CXX_FLAGS_DEV_BUILD}")
 	endif()

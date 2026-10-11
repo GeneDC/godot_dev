@@ -11,7 +11,7 @@ config_path = ROOT_DIR / "build_config.txt"
 
 def load_config():
     # Fallback defaults
-    config = {"ENABLE_TRACY": "OFF", "BUILD_DIR": "build", "ENGINE_BIN_DIR": "bin\\standard"}
+    config = {"ENABLE_TRACY": "OFF", "FASTNOISE2_FORCE_OPTIMISE": "ON", "BUILD_DIR": "build", "ENGINE_BIN_DIR": "bin\\standard"}
     
     if not os.path.exists(config_path):
         return config
@@ -22,7 +22,8 @@ def load_config():
                 key, val = line.replace(" ", "").strip().split("=")
                 if key == "ENABLE_TRACY":
                     config["ENABLE_TRACY"] = val.upper()
-
+                elif key == "FASTNOISE2_FORCE_OPTIMISE":
+                    config["FASTNOISE2_FORCE_OPTIMISE"] = val.upper()
 
     if config["ENABLE_TRACY"] == "ON":
         config["BUILD_DIR"] += "_tracy"
@@ -130,6 +131,7 @@ def generate_solution(config: dict[str, str]):
         "cmake", "-B", config["BUILD_DIR"], 
         "-G", "Visual Studio 17 2022", "-A", "x64",
         f"-DENABLE_TRACY={config['ENABLE_TRACY']}",
+        f"-DFASTNOISE2_FORCE_OPTIMISE={config['FASTNOISE2_FORCE_OPTIMISE']}",
         f"-DENGINE_BIN_DIR={config['ENGINE_BIN_DIR']}"
     ]
     print(f"    Running CMake: {' '.join(cmd)}")
