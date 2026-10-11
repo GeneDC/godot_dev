@@ -29,7 +29,7 @@ void ChunkViewer::_bind_methods()
 
 void ChunkViewer::get_chunk_positions(std::vector<Vector3i>& generate_positions, int64_t max_count)
 {
-	ZoneScopedN("ChunkViewer::get_chunk_positions");
+	ZoneScoped;
 
 	std::lock_guard<std::mutex> lock(mutex);
 

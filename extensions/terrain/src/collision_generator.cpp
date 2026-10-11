@@ -27,7 +27,7 @@ static PackedVector3Array optimise_mesh_to_faces(const PackedVector3Array& verts
 
 CollisionData CollisionGenerator::process_task(MeshData p_mesh_data)
 {
-	ZoneScopedN("CollisionGenerator::process_task");
+	ZoneScoped;
 
 	CollisionData result{ p_mesh_data.chunk_pos, RID(), p_mesh_data.revision };
 
@@ -61,7 +61,7 @@ static thread_local std::array<int32_t, 3 * POINTS_VOLUME> edge_to_index;
 
 static PackedVector3Array optimise_mesh_to_faces(const PackedVector3Array& verts)
 {
-	ZoneScopedN("optimise_mesh_to_faces");
+	ZoneScoped;
 
 	const int64_t vert_count = verts.size();
 	if (vert_count == 0)

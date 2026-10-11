@@ -36,6 +36,8 @@ ChunkGeneratorSettings::ChunkGeneratorSettings()
 
 FastNoise::SmartNode<> ChunkGeneratorSettings::create_base_node() const
 {
+	ZoneScoped;
+
 	FastSIMD::FeatureSet cpu_max_simd = FastSIMD::DetectCpuMaxFeatureSet();
 	//print_line(itos(static_cast<int>(cpu_max_simd)));
 
@@ -60,6 +62,8 @@ FastNoise::SmartNode<> ChunkGeneratorSettings::create_base_node() const
 
 FastNoise::SmartNode<> ChunkGeneratorSettings::create_multiplier_node() const
 {
+	ZoneScoped;
+
 	if (!encoded_node_tree.is_empty())
 	{
 		return nullptr;
@@ -77,6 +81,8 @@ FastNoise::SmartNode<> ChunkGeneratorSettings::create_multiplier_node() const
 
 void ChunkGeneratorSettings::rebuild_nodes()
 {
+	ZoneScoped;
+
 	if (!encoded_node_tree.is_empty())
 	{
 		base_noise_node = create_base_node();
@@ -144,7 +150,7 @@ alignas(64) thread_local std::array<float, terrain_constants::POINTS_VOLUME> Chu
 
 ChunkPtr ChunkGenerator::process_task(ChunkPtr chunk_ptr)
 {
-	ZoneScopedN("Generate Chunk Data");
+	ZoneScoped;
 
 	chunk_ptr->surface_sum = 0;
 	chunk_ptr->revision++;
@@ -175,7 +181,7 @@ ChunkPtr ChunkGenerator::process_task(ChunkPtr chunk_ptr)
 
 bool ChunkGenerator::generate_3d_density(ChunkPtr& chunk_ptr, const Vector3& p_chunk_world_pos) const
 {
-	ZoneScopedN("ChunkGenerator::generate_3d_density");
+	ZoneScoped;
 
 	if (!base_noise_node)
 	{

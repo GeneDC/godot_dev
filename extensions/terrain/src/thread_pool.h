@@ -14,6 +14,7 @@
 #include <godot_cpp/variant/builtin_vararg_methods.hpp>
 #include <godot_cpp/variant/callable.hpp>
 #include <godot_cpp/variant/callable_method_pointer.hpp>
+#include <godot_cpp/variant/char_string.hpp>
 #include <godot_cpp/variant/string.hpp>
 
 #include <atomic>
@@ -22,6 +23,7 @@
 #include <godot_utility.h>
 #include <iterator>
 #include <optional>
+#include <tracy/Tracy.hpp>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -91,6 +93,8 @@ public:
 			{ return memnew((TProcessor)); },
 			OutputSinkFn p_output_sink = nullptr)
 	{
+		ZoneScoped;
+
 		if (state.load() != ThreadPoolState::Stopped)
 		{
 			PRINT_ERROR("Can't init while ready or stopping");
@@ -104,6 +108,11 @@ public:
 			name = itos(id_counter.fetch_add(1));
 		}
 		name = "ThreadPool-" + name;
+
+		{
+			const CharString utf8_name = name.utf8();
+			ZoneText((utf8_name.get_data()), name.length());
+		}
 
 		print_line("Initializing " + name + " with " + itos(p_thread_count) + " threads");
 

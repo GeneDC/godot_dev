@@ -176,7 +176,7 @@ bool MeshGenerator::init()
 
 MeshData MeshGenerator::process_task(const ChunkData* chunk_data)
 {
-	ZoneScopedN("MeshGenerator::process_task");
+	ZoneScoped;
 
 	MeshData mesh_data{};
 	mesh_data.chunk_pos = chunk_data->position;

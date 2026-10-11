@@ -86,6 +86,8 @@ void ChunkLoader::_bind_methods()
 
 bool ChunkLoader::init()
 {
+	ZoneScoped;
+
 	if (state != State::Stopped)
 	{
 		PRINT_ERROR("Chunk Loader is already initialised or is stopping.");
@@ -202,15 +204,32 @@ bool ChunkLoader::init()
 	constexpr float unload_margin{ 3.0f };
 	chunk_scavenger.set_unload_distance(CHUNK_MAX_RADIUS + unload_margin);
 
-	chunk_node_map.reserve(32 * 32 * 32); // Reserve space for target chunk load distance
+	{
+		constexpr uint32_t chunk_node_map_reserve_count = 32 * 32 * 32;
 
-	chunk_node_pool.preallocate(30 * 30 * 30,
-			[this]()
-			{
-				ChunkNode* chunk_node = memnew(ChunkNode);
-				chunk_node->set_material(material);
-				return chunk_node;
-			});
+		ZoneScopedN("Chunk Node Map reserve");
+		const String info_text = "Count: " + String::num_int64(chunk_node_map_reserve_count);
+		const CharString utf8_text = info_text.utf8();
+		ZoneText(utf8_text.get_data(), utf8_text.length());
+
+		chunk_node_map.reserve(chunk_node_map_reserve_count); // Reserve space for target chunk load distance
+	}
+	{
+		constexpr uint32_t chunk_node_pool_preallocate_count = 32 * 32 * 32;
+
+		ZoneScopedN("Chunk Node Pool preallocate");
+		const String info_text = "Count: " + String::num_int64(chunk_node_pool_preallocate_count);
+		const CharString utf8_text = info_text.utf8();
+		ZoneText(utf8_text.get_data(), utf8_text.length());
+
+		chunk_node_pool.preallocate(chunk_node_pool_preallocate_count,
+				[this]()
+				{
+					ChunkNode* chunk_node = memnew(ChunkNode);
+					chunk_node->set_material(material);
+					return chunk_node;
+				});
+	}
 
 	state = State::Ready;
 	return true;
@@ -284,7 +303,7 @@ void ChunkLoader::pipe_collision_results(std::vector<CollisionData>&& p_collisio
 
 void ChunkLoader::update()
 {
-	ZoneScopedN("ChunkLoader::update");
+	ZoneScoped;
 
 	if (!godot::Thread::is_main_thread())
 	{
@@ -493,7 +512,7 @@ void ChunkLoader::stop()
 
 void ChunkLoader::try_update_chunks()
 {
-	ZoneScopedN("ChunkLoader::try_update_chunks");
+	ZoneScoped;
 
 	if (mesh_generator_pool->get_task_count() > 128)
 	{
@@ -559,7 +578,7 @@ void ChunkLoader::_update_chunks()
 
 void ChunkLoader::update_chunk_collisions()
 {
-	ZoneScopedN("ChunkLoader::update_chunk_collisions");
+	ZoneScoped;
 
 	ChunkViewer* chunk_viewer = get_chunk_viewer();
 	if (!chunk_viewer || !chunk_map || !collision_generator_pool.is_valid())
@@ -802,7 +821,7 @@ void ChunkLoader::modify_chunk(const ChunkData* source_chunk_data, const Terrain
 
 ChunkNode* ChunkLoader::get_or_create_chunk_node(Vector3i chunk_pos)
 {
-	ZoneScopedN("ChunkLoader::get_or_create_chunk_node");
+	ZoneScoped;
 
 	if (ChunkNode* chunk_node = get_chunk_node(chunk_pos))
 	{
@@ -814,7 +833,7 @@ ChunkNode* ChunkLoader::get_or_create_chunk_node(Vector3i chunk_pos)
 
 ChunkNode* ChunkLoader::get_chunk_node(Vector3i chunk_pos)
 {
-	ZoneScopedN("ChunkLoader::get_chunk_node");
+	ZoneScoped;
 
 	auto it = chunk_node_map.find(chunk_pos);
 	if (it != chunk_node_map.end())
@@ -841,7 +860,7 @@ void ChunkLoader::set_chunk_viewer(ChunkViewer* p_chunk_viewer)
 
 ChunkNode* ChunkLoader::_create_chunk_node(Vector3i chunk_pos)
 {
-	ZoneScopedN("ChunkLoader::_create_chunk_node");
+	ZoneScoped;
 
 	ChunkNode* chunk_node = chunk_node_pool.acquire(
 			[this]()

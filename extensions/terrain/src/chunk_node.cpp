@@ -109,7 +109,7 @@ void ChunkNode::update_chunk_mesh(const MeshData& p_mesh_data)
 
 void ChunkNode::update_chunk_collision(const CollisionData& p_collision_data)
 {
-	ZoneScopedN("Chunk::update_chunk_collision");
+	ZoneScoped;
 
 	if (p_collision_data.revision <= collision_revision)
 	{
