@@ -189,7 +189,7 @@ MeshData MeshGenerator::process_task(const ChunkData* chunk_data)
 		return mesh_data;
 	}
 
-	if (chunk_data->is_meshing_ready())
+	if (!chunk_data->is_meshing_ready())
 	{
 		PRINT_WARNING("Skipping chunk as it's not ready for meshing. Make sure it has the required neighbours before queuing with the mesh generator.");
 		return mesh_data;
