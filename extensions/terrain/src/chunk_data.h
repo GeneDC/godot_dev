@@ -56,7 +56,7 @@ public:
 
 	// Sets the bit for relative neighbour
 	// Returns true if all neighbour are present
-	inline bool notify_neighbour_present(int dx, int dy, int dz) const
+	inline bool set_neighbour_loaded(int dx, int dy, int dz) const
 	{
 		const uint8_t bit = static_cast<uint8_t>(1u << (dx | (dy << 1) | (dz << 2)));
 		const uint8_t prev = neighbour_mask.fetch_or(bit, std::memory_order_acq_rel);

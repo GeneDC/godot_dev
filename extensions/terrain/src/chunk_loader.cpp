@@ -280,11 +280,11 @@ void ChunkLoader::pipe_chunk_results(std::vector<ChunkDataPtr>&& p_chunk_ptrs)
 				{
 					if (dx == 0 && dy == 0 && dz == 0)
 					{
-						chunk_data->notify_neighbour_present(0, 0, 0); // this chunk
+						chunk_data->set_neighbour_loaded(0, 0, 0); // this chunk
 					}
 					else if (chunk_map->get_chunk(chunk_pos + Vector3i(dx, dy, dz)))
 					{
-						chunk_data->notify_neighbour_present(dx, dy, dz);
+						chunk_data->set_neighbour_loaded(dx, dy, dz);
 					}
 				}
 			}
@@ -309,7 +309,7 @@ void ChunkLoader::pipe_chunk_results(std::vector<ChunkDataPtr>&& p_chunk_ptrs)
 
 					const Vector3i target_pos = chunk_pos + Vector3i(dx, dy, dz);
 					const ChunkData* target_chunk_data = chunk_map->get_chunk(target_pos);
-					if (target_chunk_data && target_chunk_data->notify_neighbour_present(-dx, -dy, -dz) && target_chunk_data->surface_state == SurfaceState::MIXED)
+					if (target_chunk_data && target_chunk_data->set_neighbour_loaded(-dx, -dy, -dz) && target_chunk_data->surface_state == SurfaceState::MIXED)
 					{
 						chunk_datas_to_mesh.push_back(target_chunk_data);
 					}
