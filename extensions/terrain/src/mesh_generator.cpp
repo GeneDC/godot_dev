@@ -183,10 +183,15 @@ MeshData MeshGenerator::process_task(const ChunkData* chunk_data)
 	mesh_data.revision = chunk_data->revision;
 
 	// No mesh to generate if the chunk is entirely empty or full
-	// TODO: Rework this check when we need to generate with the surrounding chunks
 	if (chunk_data->surface_state != SurfaceState::MIXED)
 	{
 		PRINT_WARNING("Skipping chunk that will have no mesh data. This should be skipped before it gets to the mesh generator.");
+		return mesh_data;
+	}
+
+	if (chunk_data->is_meshing_ready())
+	{
+		PRINT_WARNING("Skipping chunk as it's not ready for meshing. Make sure it has the required neighbours before queuing with the mesh generator.");
 		return mesh_data;
 	}
 

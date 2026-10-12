@@ -104,7 +104,7 @@ private:
 	void _update_chunks();
 	void update_chunk_collisions();
 
-	void pipe_chunk_results(std::vector<ChunkPtr>&& p_chunk_ptrs);
+	void pipe_chunk_results(std::vector<ChunkDataPtr>&& p_chunk_ptrs);
 	void pipe_mesh_results(std::vector<MeshData>&& p_mesh_datas);
 	void pipe_collision_results(std::vector<CollisionData>&& p_collision_datas);
 
@@ -126,7 +126,7 @@ private:
 	std::vector<CollisionData> incoming_collision_datas{};
 	std::vector<CollisionData> collision_datas{};
 
-	using ChunkGeneratorPool = ThreadPool<ChunkGenerator, ChunkPtr, ChunkPtr>;
+	using ChunkGeneratorPool = ThreadPool<ChunkGenerator, ChunkDataPtr, ChunkDataPtr>;
 	Ref<ChunkGeneratorPool> chunk_generator_pool;
 
 	using MeshGeneratorPool = ThreadPool<MeshGenerator, const ChunkData*, MeshData>;

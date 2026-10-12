@@ -41,6 +41,7 @@
 #include <godot_cpp/variant/vector3i.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <cstdio>
 #include <iterator>
@@ -192,7 +193,7 @@ bool ChunkLoader::init()
 				"ChunkGen",
 				[settings = chunk_generator_settings]()
 				{ return ChunkGenerator::create(settings); },
-				[this](std::vector<ChunkPtr>&& chunk_ptrs)
+				[this](std::vector<ChunkDataPtr>&& chunk_ptrs)
 				{ pipe_chunk_results(std::move(chunk_ptrs)); });
 	}
 	else
@@ -243,19 +244,77 @@ bool ChunkLoader::init()
 	return true;
 }
 
-void ChunkLoader::pipe_chunk_results(std::vector<ChunkPtr>&& p_chunk_ptrs)
+void ChunkLoader::pipe_chunk_results(std::vector<ChunkDataPtr>&& p_chunk_ptrs)
 {
-	std::vector<const ChunkData*> chunk_datas_to_mesh;
-	chunk_datas_to_mesh.reserve(p_chunk_ptrs.size());
+	// Relative bit indices in T's 2x2x2 neighborhood for offset Delta = (P - T)
+	// where Delta components are in {0, 1}
+	constexpr auto get_neighbour_bit = [](int dx, int dy, int dz) -> uint8_t
+	{
+		return static_cast<uint8_t>(1u << (dx | (dy << 1) | (dz << 2)));
+	};
 
 	TracyPlot("Chunks: Incoming Batch Size", static_cast<int64_t>(p_chunk_ptrs.size()));
 
-	for (ChunkPtr& chunk_ptr : p_chunk_ptrs)
+	std::vector<const ChunkData*> chunk_datas_to_update;
+	chunk_datas_to_update.reserve(p_chunk_ptrs.size());
+
+	for (ChunkDataPtr& chunk_ptr : p_chunk_ptrs)
 	{
 		const ChunkData* chunk_data = chunk_map->publish_chunk(std::move(chunk_ptr));
-		if (chunk_data && chunk_data->surface_state == SurfaceState::MIXED)
+		chunk_datas_to_update.push_back(chunk_data);
+	}
+
+	std::vector<const ChunkData*> chunk_datas_to_mesh;
+	chunk_datas_to_mesh.reserve(p_chunk_ptrs.size());
+
+	for (const ChunkData* chunk_data : chunk_datas_to_update)
+	{
+		const Vector3i chunk_pos = chunk_data->position;
+
+		// Update this chunks neighbour mask
+		for (int dz = 0; dz <= 1; ++dz)
+		{
+			for (int dy = 0; dy <= 1; ++dy)
+			{
+				for (int dx = 0; dx <= 1; ++dx)
+				{
+					if (dx == 0 && dy == 0 && dz == 0)
+					{
+						chunk_data->notify_neighbour_present(0, 0, 0); // this chunk
+					}
+					else if (chunk_map->get_chunk(chunk_pos + Vector3i(dx, dy, dz)))
+					{
+						chunk_data->notify_neighbour_present(dx, dy, dz);
+					}
+				}
+			}
+		}
+
+		if (chunk_data->is_meshing_ready() && chunk_data->surface_state == SurfaceState::MIXED)
 		{
 			chunk_datas_to_mesh.push_back(chunk_data);
+		}
+
+		// Update the 8 chunks neighbour mask
+		for (int dz = -1; dz <= 0; ++dz)
+		{
+			for (int dy = -1; dy <= 0; ++dy)
+			{
+				for (int dx = -1; dx <= 0; ++dx)
+				{
+					if (dx == 0 && dy == 0 && dz == 0)
+					{
+						continue; // this chunk
+					}
+
+					const Vector3i target_pos = chunk_pos + Vector3i(dx, dy, dz);
+					const ChunkData* target_chunk_data = chunk_map->get_chunk(target_pos);
+					if (target_chunk_data && target_chunk_data->notify_neighbour_present(-dx, -dy, -dz) && target_chunk_data->surface_state == SurfaceState::MIXED)
+					{
+						chunk_datas_to_mesh.push_back(target_chunk_data);
+					}
+				}
+			}
 		}
 	}
 
@@ -572,7 +631,7 @@ void ChunkLoader::_update_chunks()
 		ZoneNamedN(zoneQueueChunksForGeneration, "Queue chunks for generation", true);
 		if (generate_positions.size() > 0)
 		{
-			std::vector<ChunkPtr> chunks_to_generate;
+			std::vector<ChunkDataPtr> chunks_to_generate;
 			chunks_to_generate.reserve(generate_positions.size());
 			for (const Vector3i& chunk_pos : generate_positions)
 			{
@@ -733,7 +792,7 @@ void ChunkLoader::modify_terrain_sphere(Vector3 global_position, float radius, b
 
 void ChunkLoader::modify_chunk(const ChunkData* source_chunk_data, const TerrainModification& modification)
 {
-	ChunkPtr modified_chunk_data = chunk_map->acquire_chunk(source_chunk_data->position);
+	ChunkDataPtr modified_chunk_data = chunk_map->acquire_chunk(source_chunk_data->position);
 	*modified_chunk_data = *source_chunk_data; // Copies the source data to the newly acquired chunk ptr
 
 	const float radius{ modification.size };
@@ -821,7 +880,7 @@ void ChunkLoader::modify_chunk(const ChunkData* source_chunk_data, const Terrain
 	}
 
 	const ChunkData* new_chunk_data = chunk_map->publish_chunk(std::move(modified_chunk_data));
-	if (new_chunk_data->surface_state == SurfaceState::MIXED)
+	if (new_chunk_data->surface_state == SurfaceState::MIXED && new_chunk_data->is_meshing_ready())
 	{
 		mesh_generator_pool->queue_task(std::move(new_chunk_data), true);
 	}

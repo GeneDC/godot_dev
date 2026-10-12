@@ -66,7 +66,7 @@ private:
 	FastNoise::SmartNode<> multiplier_noise_node;
 };
 
-class ChunkGenerator final : public ITaskProcessor<ChunkPtr, ChunkPtr>
+class ChunkGenerator final : public ITaskProcessor<ChunkDataPtr, ChunkDataPtr>
 {
 	GDCLASS(ChunkGenerator, RefCounted)
 
@@ -92,13 +92,13 @@ public:
 		return chunk_generator;
 	}
 
-	virtual ChunkPtr process_task(ChunkPtr chunk_ptr) override;
+	virtual ChunkDataPtr process_task(ChunkDataPtr chunk_ptr) override;
 
 protected:
 	static void _bind_methods() {}
 
 private:
-	bool generate_3d_density(ChunkPtr& chunk_ptr, const Vector3& p_chunk_world_pos) const;
+	bool generate_3d_density(ChunkDataPtr& chunk_ptr, const Vector3& p_chunk_world_pos) const;
 
 	Ref<ChunkGeneratorSettings> settings;
 	FastNoise::SmartNode<> base_noise_node;

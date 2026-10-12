@@ -149,7 +149,7 @@ void ChunkGeneratorSettings::_bind_methods()
 alignas(64) thread_local float ChunkGenerator::uint8_to_float[256];
 alignas(64) thread_local std::array<float, terrain_constants::POINTS_VOLUME> ChunkGenerator::tl_scratch_volume{};
 
-ChunkPtr ChunkGenerator::process_task(ChunkPtr chunk_ptr)
+ChunkDataPtr ChunkGenerator::process_task(ChunkDataPtr chunk_ptr)
 {
 	ZoneScoped;
 
@@ -180,7 +180,7 @@ ChunkPtr ChunkGenerator::process_task(ChunkPtr chunk_ptr)
 	return std::move(chunk_ptr);
 }
 
-bool ChunkGenerator::generate_3d_density(ChunkPtr& chunk_ptr, const Vector3& p_chunk_world_pos) const
+bool ChunkGenerator::generate_3d_density(ChunkDataPtr& chunk_ptr, const Vector3& p_chunk_world_pos) const
 {
 	ZoneScoped;
 

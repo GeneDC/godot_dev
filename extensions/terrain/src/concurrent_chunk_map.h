@@ -37,7 +37,7 @@ struct Vector3iHasher
 	}
 };
 
-typedef std::unordered_map<Vector3i, ChunkPtr, Vector3iHasher> MapShardData;
+typedef std::unordered_map<Vector3i, ChunkDataPtr, Vector3iHasher> MapShardData;
 
 class ConcurrentChunkMap
 {
@@ -122,7 +122,7 @@ public:
 		// Take chunk from the pool and put it in the loaded chunks
 		uint64_t shard_idx = get_shard(pos);
 		PoolShard& pool_shard = pool_shards[shard_idx];
-		ChunkPtr new_ptr = pool_shard.pool->acquire();
+		ChunkDataPtr new_ptr = pool_shard.pool->acquire();
 
 		new_ptr->position = pos;
 
@@ -142,14 +142,14 @@ public:
 	}
 
 	// Returns a chunk from the pool, ready to be modified on the heap
-	ChunkPtr acquire_chunk(Vector3i pos)
+	ChunkDataPtr acquire_chunk(Vector3i pos)
 	{
-		ChunkPtr chunk_ptr = pool_shards[get_shard(pos)].pool->acquire();
+		ChunkDataPtr chunk_ptr = pool_shards[get_shard(pos)].pool->acquire();
 		chunk_ptr->position = pos;
 		return std::move(chunk_ptr);
 	}
 
-	const ChunkData* publish_chunk(ChunkPtr new_chunk_ptr)
+	const ChunkData* publish_chunk(ChunkDataPtr new_chunk_ptr)
 	{
 		const Vector3i pos = new_chunk_ptr->position;
 		const int64_t shard_idx = get_shard(pos);
