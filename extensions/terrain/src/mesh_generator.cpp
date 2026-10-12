@@ -1,6 +1,7 @@
 #include "mesh_generator.h"
 
 #include "chunk_data.h"
+#include "concurrent_chunk_map.h"
 #include "godot_utility.h"
 #include "terrain_constants.h"
 
@@ -47,7 +48,7 @@ MeshGenerator::~MeshGenerator()
 		if (uniform_set.is_valid()) local_rendering_device->free_rid(uniform_set);
 		if (shader.is_valid()) local_rendering_device->free_rid(shader);
 
-		if (points_buffer.is_valid()) local_rendering_device->free_rid(points_buffer);
+		if (points_texture.is_valid()) local_rendering_device->free_rid(points_texture);
 		if (points_sampler_rid.is_valid()) local_rendering_device->free_rid(points_sampler_rid);
 		if (vertex_buffer.is_valid()) local_rendering_device->free_rid(vertex_buffer);
 		if (normal_buffer.is_valid()) local_rendering_device->free_rid(normal_buffer);
@@ -100,29 +101,33 @@ bool MeshGenerator::init()
 
 	TypedArray<RDUniform> uniforms{};
 
+	constexpr int neighborhood_size = POINTS_SIZE * 2; // 64
+	constexpr int neighborhood_volume = neighborhood_size * neighborhood_size * neighborhood_size; // 262,144 bytes
+	staging_density_buffer.resize(neighborhood_volume, 0);
+
 	points_texture_format.instantiate();
 	points_texture_format->set_format(RenderingDevice::DATA_FORMAT_R8_UNORM);
-	points_texture_format->set_width(POINTS_SIZE);
-	points_texture_format->set_height(POINTS_SIZE);
-	points_texture_format->set_depth(POINTS_SIZE);
+	points_texture_format->set_width(neighborhood_size);
+	points_texture_format->set_height(neighborhood_size);
+	points_texture_format->set_depth(neighborhood_size);
 	points_texture_format->set_texture_type(RenderingDevice::TEXTURE_TYPE_3D);
 	points_texture_format->set_usage_bits(RenderingDevice::TEXTURE_USAGE_CAN_UPDATE_BIT | RenderingDevice::TEXTURE_USAGE_SAMPLING_BIT);
 
 	points_texture_view.instantiate();
-
-	points_buffer = local_rendering_device->texture_create(points_texture_format, points_texture_view);
 
 	points_sampler_state.instantiate();
 	points_sampler_state->set_mag_filter(RenderingDevice::SAMPLER_FILTER_NEAREST);
 	points_sampler_state->set_min_filter(RenderingDevice::SAMPLER_FILTER_NEAREST);
 	points_sampler_rid = local_rendering_device->sampler_create(points_sampler_state);
 
+	points_texture = local_rendering_device->texture_create(points_texture_format, points_texture_view);
+
 	Ref<RDUniform> uniform_points{};
 	uniform_points.instantiate();
 	uniform_points->set_uniform_type(RenderingDevice::UNIFORM_TYPE_SAMPLER_WITH_TEXTURE);
-	uniform_points->set_binding(0); // Match layout(binding = 0) in the shader
+	uniform_points->set_binding(0);
 	uniform_points->add_id(points_sampler_rid);
-	uniform_points->add_id(points_buffer);
+	uniform_points->add_id(points_texture);
 	uniforms.push_back(uniform_points);
 
 	constexpr int max_triangle_count = CHUNK_VOLUME * 5; // max tris per voxel is 5
@@ -168,8 +173,18 @@ bool MeshGenerator::init()
 
 	int shader_set = 0;
 	uniform_set = local_rendering_device->uniform_set_create(uniforms, shader, shader_set);
+	if (!uniform_set.is_valid())
+	{
+		PRINT_ERROR("Failed to create uniform set 0 for compute shader!");
+		return false;
+	}
 
 	pipeline = local_rendering_device->compute_pipeline_create(shader);
+	if (!pipeline.is_valid())
+	{
+		PRINT_ERROR("Failed to create compute pipeline!");
+		return false;
+	}
 
 	return true;
 }
@@ -179,6 +194,13 @@ MeshData MeshGenerator::process_task(const ChunkData* chunk_data)
 	ZoneScoped;
 
 	MeshData mesh_data{};
+
+	if (!chunk_data)
+	{
+		PRINT_ERROR("MeshGenerator::process_task - Null chunk data passed");
+		return mesh_data;
+	}
+
 	mesh_data.chunk_pos = chunk_data->position;
 	mesh_data.revision = chunk_data->revision;
 
@@ -219,12 +241,64 @@ MeshData MeshGenerator::process_task(const ChunkData* chunk_data)
 		return mesh_data;
 	}
 
-	PackedByteArray points_byte_array;
-	points_byte_array.resize(POINTS_VOLUME);
-	std::memcpy(points_byte_array.ptrw(), chunk_data->points.data(), terrain_constants::POINTS_VOLUME);
+	auto shared_chunk_map = chunk_map.lock();
+	if (!shared_chunk_map)
+	{
+		PRINT_ERROR("Chunk map is null in MeshGenerator");
+		return mesh_data;
+	}
 
-	// update the points buffer
-	local_rendering_device->texture_update(points_buffer, 0, points_byte_array);
+	constexpr int neighborhood_size = POINTS_SIZE * 2; // 64
+	constexpr int neighborhood_slice = neighborhood_size * neighborhood_size; // 4096
+	constexpr int neighborhood_volume = neighborhood_size * neighborhood_slice;
+
+	// Pack 8 chunks into a 64x64x64 3D density volume
+	for (int dz = 0; dz <= 1; ++dz)
+	{
+		const int z_offset = dz * POINTS_SIZE;
+		for (int dy = 0; dy <= 1; ++dy)
+		{
+			const int y_offset = dy * POINTS_SIZE;
+			for (int dx = 0; dx <= 1; ++dx)
+			{
+				const int x_offset = dx * POINTS_SIZE;
+				const Vector3i target_pos = chunk_data->position + Vector3i(dx, dy, dz);
+				const ChunkData* neighbour_chunk = (dx == 0 && dy == 0 && dz == 0) ? chunk_data : shared_chunk_map->get_chunk(target_pos);
+
+				if (neighbour_chunk)
+				{
+					for (int z = 0; z < POINTS_SIZE; ++z)
+					{
+						const int src_z_stride = z * POINTS_AREA;
+						const int dst_z_stride = (z_offset + z) * neighborhood_slice;
+						for (int y = 0; y < POINTS_SIZE; ++y)
+						{
+							const int src_idx = (y * POINTS_SIZE) + src_z_stride;
+							const int dst_idx = x_offset + ((y_offset + y) * neighborhood_size) + dst_z_stride;
+							std::memcpy(&staging_density_buffer[dst_idx], &neighbour_chunk->points[src_idx], POINTS_SIZE);
+						}
+					}
+				}
+				else
+				{
+					for (int z = 0; z < POINTS_SIZE; ++z)
+					{
+						const int dst_z_stride = (z_offset + z) * neighborhood_slice;
+						for (int y = 0; y < POINTS_SIZE; ++y)
+						{
+							const int dst_idx = x_offset + ((y_offset + y) * neighborhood_size) + dst_z_stride;
+							std::memset(&staging_density_buffer[dst_idx], 0, POINTS_SIZE);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	PackedByteArray points_byte_array;
+	points_byte_array.resize(neighborhood_volume);
+	std::memcpy(points_byte_array.ptrw(), staging_density_buffer.data(), neighborhood_volume);
+	local_rendering_device->texture_update(points_texture, 0, points_byte_array);
 
 	// clear the previous buffers
 	local_rendering_device->buffer_clear(vertex_buffer, 0, vertex_buffer_byte_count);

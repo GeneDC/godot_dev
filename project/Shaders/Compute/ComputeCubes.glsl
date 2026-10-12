@@ -6,7 +6,7 @@
 // Invocations in the (x, y, z) dimension. Max 1024! (32x32x1 or 10x10x10)
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
 
-// A binding to the buffer we create in our script
+// Combined 2x2x2 neighborhood texture of size 64x64x64
 layout(set = 0, binding = 0) uniform sampler3D points_tex;
 
 layout(set = 0, binding = 1, std430) restrict writeonly buffer VertexBuffer {
@@ -90,7 +90,6 @@ void AddTri(vec4 vert_a, vec4 vert_b, vec4 vert_c)
 	colour_buffer.colours[index + 1] = terrain_colour;
 	colour_buffer.colours[index + 2] = terrain_colour;
 }
-
 
 shared float points_cache[9 * 9 * 9];
 

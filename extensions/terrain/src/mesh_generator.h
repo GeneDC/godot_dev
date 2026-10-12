@@ -18,7 +18,12 @@
 #include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/vector3i.hpp>
 
+#include <array>
 #include <cstdint>
+#include <memory>
+#include <vector>
+
+class ConcurrentChunkMap;
 
 using namespace godot;
 
@@ -55,10 +60,13 @@ public:
 	// Call once to setup. Creates local rendering device, loads shader, and setups the buffers and uniforms
 	bool init();
 
-	static Ref<MeshGenerator> create(Ref<MeshGeneratorSettings> p_settings)
+	void set_chunk_map(std::weak_ptr<ConcurrentChunkMap> p_chunk_map) { chunk_map = p_chunk_map; }
+
+	static Ref<MeshGenerator> create(Ref<MeshGeneratorSettings> p_settings, std::weak_ptr<ConcurrentChunkMap> p_chunk_map = {})
 	{
 		Ref<MeshGenerator> mesh_generator = memnew((MeshGenerator));
 		mesh_generator->settings = p_settings->duplicate(true);
+		mesh_generator->set_chunk_map(p_chunk_map);
 
 		mesh_generator->init();
 		return mesh_generator;
@@ -71,6 +79,7 @@ protected:
 
 private:
 	Ref<MeshGeneratorSettings> settings{};
+	std::weak_ptr<ConcurrentChunkMap> chunk_map{};
 
 	RenderingDevice* local_rendering_device = nullptr;
 
@@ -81,12 +90,13 @@ private:
 	RID uniform_set;
 	RID pipeline;
 
-	// Shader Input buffers
-	RID points_buffer;
+	// Shader Input buffer: 2x2x2 neighborhood 3D texture (64x64x64)
+	RID points_texture;
 	Ref<RDTextureFormat> points_texture_format;
 	Ref<RDTextureView> points_texture_view;
 	Ref<RDSamplerState> points_sampler_state;
 	RID points_sampler_rid;
+	std::vector<uint8_t> staging_density_buffer{};
 
 	// Shader Output buffers
 	int vertex_buffer_byte_count = -1;

@@ -169,8 +169,8 @@ bool ChunkLoader::init()
 		mesh_generator_pool->init(
 				mesh_generator_thread_count,
 				"MeshGen",
-				[settings = mesh_generator_settings]()
-				{ return MeshGenerator::create(settings); },
+				[settings = mesh_generator_settings, map = chunk_map]()
+				{ return MeshGenerator::create(settings, map); },
 				[this](std::vector<MeshData>&& mesh_datas)
 				{ pipe_mesh_results(std::move(mesh_datas)); });
 	}
@@ -246,13 +246,6 @@ bool ChunkLoader::init()
 
 void ChunkLoader::pipe_chunk_results(std::vector<ChunkDataPtr>&& p_chunk_ptrs)
 {
-	// Relative bit indices in T's 2x2x2 neighborhood for offset Delta = (P - T)
-	// where Delta components are in {0, 1}
-	constexpr auto get_neighbour_bit = [](int dx, int dy, int dz) -> uint8_t
-	{
-		return static_cast<uint8_t>(1u << (dx | (dy << 1) | (dz << 2)));
-	};
-
 	TracyPlot("Chunks: Incoming Batch Size", static_cast<int64_t>(p_chunk_ptrs.size()));
 
 	std::vector<const ChunkData*> chunk_datas_to_update;
