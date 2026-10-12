@@ -85,6 +85,7 @@ endfunction()
 # FastNoise2 integration
 if(EXISTS "${FASTNOISE2_DIR}/CMakeLists.txt")
 	message(STATUS "Adding FastNoise2 subdirectory")
+	set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 	set(FASTNOISE2_NOISETOOL OFF CACHE BOOL "" FORCE)
 	set(FASTNOISE2_TESTS OFF CACHE BOOL "" FORCE)
 
