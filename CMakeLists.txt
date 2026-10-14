@@ -89,11 +89,6 @@ if(EXISTS "${FASTNOISE2_DIR}/CMakeLists.txt")
 	set(FASTNOISE2_NOISETOOL OFF CACHE BOOL "" FORCE)
 	set(FASTNOISE2_TESTS OFF CACHE BOOL "" FORCE)
 
-	# disable NEON to workaround FastSIMD upstream GCC ARM NEON type-cast bug
-	if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|arm)" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-		set(FASTSIMD_COMPILE_ARM_NEON OFF CACHE BOOL "" FORCE)
-	endif()
-
 	# Stash flags and force O2/Ob2 without RTC for FastNoise2
 	if(MSVC AND FASTNOISE2_FORCE_OPTIMISE)
 		set(_SAVED_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
@@ -106,6 +101,16 @@ if(EXISTS "${FASTNOISE2_DIR}/CMakeLists.txt")
 
 	add_subdirectory("${FASTNOISE2_DIR}" "${CMAKE_BINARY_DIR}/thirdparty/FastNoise2" EXCLUDE_FROM_ALL)
 	set_folder_recursive("${FASTNOISE2_DIR}" "thirdparty/FastNoise2")
+
+	# Patch FastSIMD upstream GCC ARM NEON type-cast bug in generated/fetched source
+	set(_FASTSIMD_NEON_H "${CMAKE_BINARY_DIR}/_deps/fastsimd-src/include/FastSIMD/ToolSet/ARM/NEON.h")
+	if(EXISTS "${_FASTSIMD_NEON_H}")
+		file(READ "${_FASTSIMD_NEON_H}" _NEON_CONTENT)
+		if(_NEON_CONTENT MATCHES "return a\\.GetNative\\(\\);")
+			string(REPLACE "return a.GetNative();" "return vreinterpretq_s32_u32(a.GetNative());" _NEON_CONTENT "${_NEON_CONTENT}")
+			file(WRITE "${_FASTSIMD_NEON_H}" "${_NEON_CONTENT}")
+		endif()
+	endif()
 
 	# FastNoise2 adds x86-specific vzeroupper flags unconditionally; remove them on non-x86 architectures
 	if(TARGET FastSIMD_FastNoise AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i[3-6]86)")
