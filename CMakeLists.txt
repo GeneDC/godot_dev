@@ -102,6 +102,15 @@ if(EXISTS "${FASTNOISE2_DIR}/CMakeLists.txt")
 	add_subdirectory("${FASTNOISE2_DIR}" "${CMAKE_BINARY_DIR}/thirdparty/FastNoise2" EXCLUDE_FROM_ALL)
 	set_folder_recursive("${FASTNOISE2_DIR}" "thirdparty/FastNoise2")
 
+	# FastNoise2 adds x86-specific vzeroupper flags unconditionally; remove them on non-x86 architectures
+	if(TARGET FastSIMD_FastNoise AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i[3-6]86)")
+		get_target_property(_FASTSIMD_OPTS FastSIMD_FastNoise COMPILE_OPTIONS)
+		if(_FASTSIMD_OPTS)
+			list(FILTER _FASTSIMD_OPTS EXCLUDE REGEX "-mno-vzeroupper|-x86-use-vzeroupper=0")
+			set_target_properties(FastSIMD_FastNoise PROPERTIES COMPILE_OPTIONS "${_FASTSIMD_OPTS}")
+		endif()
+	endif()
+
 	if(MSVC AND FASTNOISE2_FORCE_OPTIMISE)
 		set(CMAKE_CXX_FLAGS_DEBUG "${_SAVED_CXX_FLAGS_DEBUG}")
 		set(CMAKE_CXX_FLAGS_DEV_BUILD "${_SAVED_CXX_FLAGS_DEV_BUILD}")
