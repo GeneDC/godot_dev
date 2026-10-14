@@ -102,14 +102,9 @@ if(EXISTS "${FASTNOISE2_DIR}/CMakeLists.txt")
 	add_subdirectory("${FASTNOISE2_DIR}" "${CMAKE_BINARY_DIR}/thirdparty/FastNoise2" EXCLUDE_FROM_ALL)
 	set_folder_recursive("${FASTNOISE2_DIR}" "thirdparty/FastNoise2")
 
-	# Patch FastSIMD upstream GCC ARM NEON type-cast bug in generated/fetched source
-	set(_FASTSIMD_NEON_H "${CMAKE_BINARY_DIR}/_deps/fastsimd-src/include/FastSIMD/ToolSet/ARM/NEON.h")
-	if(EXISTS "${_FASTSIMD_NEON_H}")
-		file(READ "${_FASTSIMD_NEON_H}" _NEON_CONTENT)
-		if(_NEON_CONTENT MATCHES "return a\\.GetNative\\(\\);")
-			string(REPLACE "return a.GetNative();" "return vreinterpretq_s32_u32(a.GetNative());" _NEON_CONTENT "${_NEON_CONTENT}")
-			file(WRITE "${_FASTSIMD_NEON_H}" "${_NEON_CONTENT}")
-		endif()
+	# Allow vector conversions on GCC ARM builds to fix FastSIMD NEON/AARCH64 templates
+	if(TARGET FastSIMD_FastNoise AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|arm)")
+		target_compile_options(FastSIMD_FastNoise PRIVATE -flax-vector-conversions)
 	endif()
 
 	# FastNoise2 adds x86-specific vzeroupper flags unconditionally; remove them on non-x86 architectures
